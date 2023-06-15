@@ -6,13 +6,14 @@ spring:
     password: testTest
     url:
       jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true
-jpa:
-  properties:
-    hibernate:
-      dialect: org.hibernate.dialect.MySQL8Dialect
+
+  jpa:
+    properties:
       hibernate:
-        ddl-auto: update
-      show-sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
 
 indexing-settings:
   sites:
