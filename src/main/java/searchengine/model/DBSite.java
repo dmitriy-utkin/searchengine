@@ -5,14 +5,14 @@ import lombok.Getter;
 import lombok.Setter;
 
 import javax.persistence.*;
-import java.time.LocalDateTime;
+import java.util.Date;
 
 @Entity
 @Getter
 @Setter
 @EqualsAndHashCode
 @Table(name = "sites")
-public class Site {
+public class DBSite {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,7 +23,7 @@ public class Site {
     private Status status;
 
     @Column(name = "status_time", nullable = false)
-    private LocalDateTime statusTime;
+    private Date statusTime;
 
     @Column(name = "last_error", columnDefinition = "TEXT")
     private String lastError;
