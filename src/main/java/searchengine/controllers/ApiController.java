@@ -1,19 +1,18 @@
 package searchengine.controllers;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.services.IndexResponseService;
-import searchengine.services.IndexResponseServiceImpl;
 import searchengine.dto.statistics.StatisticsResponse;
-import searchengine.model.PageRepository;
-import searchengine.model.SiteRepository;
+import searchengine.repository.PageRepository;
+import searchengine.repository.SiteRepository;
 import searchengine.services.IndexingService;
 import searchengine.services.StatisticsService;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api")
@@ -43,7 +42,7 @@ public class ApiController {
     }
 
     @GetMapping("/startIndexing")
-    public ResponseEntity<IndexResponseService> startIndexing() {
+    public ResponseEntity<IndexResponseService> startIndexing() throws IOException {
         return indexingService.startIndexing(sitesList, siteRepository, pageRepository);
     }
 }

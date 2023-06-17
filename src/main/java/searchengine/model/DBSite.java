@@ -1,8 +1,6 @@
 package searchengine.model;
 
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import javax.persistence.*;
 import java.util.Date;
@@ -10,7 +8,10 @@ import java.util.Date;
 @Entity
 @Getter
 @Setter
+@Builder
 @EqualsAndHashCode
+@NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "sites")
 public class DBSite {
 
