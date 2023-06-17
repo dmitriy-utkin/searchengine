@@ -1,24 +1,24 @@
-package searchengine.dto.indexing;
+package searchengine.services;
 
 import com.sun.istack.NotNull;
 import jdk.jfr.BooleanFlag;
 import lombok.Value;
 
-public enum IndexResponseImpl {;
+public enum IndexResponseServiceImpl {;
 
     private interface Result{@BooleanFlag Boolean getResult(); }
     private interface Error{@NotNull String getError(); }
 
     public enum Response {;
 
-        @Value public static class SuccessResponse implements IndexResponse, Result {
-            public SuccessResponse() {
+        @Value public static class SuccessResponseService implements IndexResponseService, Result {
+            public SuccessResponseService() {
                 this.result = true;
             }
             Boolean result;
         }
 
-        @Value public static class BadRequest implements IndexResponse, Result, Error {
+        @Value public static class BadRequest implements IndexResponseService, Result, Error {
             public BadRequest(String error) {
                 this.error = error;
                 this.result = false;

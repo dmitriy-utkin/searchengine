@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
-import searchengine.dto.indexing.IndexResponse;
-import searchengine.dto.indexing.IndexResponseImpl;
+import searchengine.services.IndexResponseService;
+import searchengine.services.IndexResponseServiceImpl;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.model.PageRepository;
 import searchengine.model.SiteRepository;
@@ -43,19 +43,8 @@ public class ApiController {
     }
 
     @GetMapping("/startIndexing")
-    public ResponseEntity<IndexResponse> startIndexing() {
-
-//        for (Site site : sitesList.getSites()) {
-//            //TODO: change DB usage from siteRepo to DTO structure
-//            if (siteRepository.findByUrl(site.getUrl()).isPresent()) {
-//                siteRepository.deleteByUrl(site.getUrl());
-//            }
-//            siteRepository.save(indexingService.getSite(site));
-//        }
-
-//        return new ResponseEntity<>(new IndexResponseImpl.Response.SuccessResponse(), HttpStatus.OK);
-
-        return new ResponseEntity<>(new IndexResponseImpl.Response.BadRequest("Indexation already started."), HttpStatus.BAD_REQUEST);
+    public ResponseEntity<IndexResponseService> startIndexing() {
+        return indexingService.startIndexing(sitesList, siteRepository, pageRepository);
     }
 }
 

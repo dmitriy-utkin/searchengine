@@ -1,4 +1,5 @@
 package searchengine.dto.indexing;
 
-public interface IndexResponse {
+public class SiteDTO {
+
 }
