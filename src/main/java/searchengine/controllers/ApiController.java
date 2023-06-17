@@ -8,17 +8,12 @@ import org.springframework.web.bind.annotation.RestController;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.dto.indexing.IndexResponse;
-import searchengine.dto.indexing.SuccessIndexResponse;
+import searchengine.dto.indexing.IndexResponseImpl;
 import searchengine.dto.statistics.StatisticsResponse;
-import searchengine.model.DBSite;
 import searchengine.model.PageRepository;
 import searchengine.model.SiteRepository;
-import searchengine.model.Status;
 import searchengine.services.IndexingService;
 import searchengine.services.StatisticsService;
-
-import java.time.LocalDateTime;
-import java.util.Date;
 
 @RestController
 @RequestMapping("/api")
@@ -50,15 +45,17 @@ public class ApiController {
     @GetMapping("/startIndexing")
     public ResponseEntity<IndexResponse> startIndexing() {
 
-        for (Site site : sitesList.getSites()) {
-            //TODO: change DB usage from siteRepo to DTO structure
-            if (siteRepository.findByUrl(site.getUrl()).isPresent()) {
-                siteRepository.deleteByUrl(site.getUrl());
-            }
-            siteRepository.save(indexingService.getSite(site));
-        }
+//        for (Site site : sitesList.getSites()) {
+//            //TODO: change DB usage from siteRepo to DTO structure
+//            if (siteRepository.findByUrl(site.getUrl()).isPresent()) {
+//                siteRepository.deleteByUrl(site.getUrl());
+//            }
+//            siteRepository.save(indexingService.getSite(site));
+//        }
 
-        return new ResponseEntity<>(new SuccessIndexResponse(true), HttpStatus.OK);
+//        return new ResponseEntity<>(new IndexResponseImpl.Response.SuccessResponse(), HttpStatus.OK);
+
+        return new ResponseEntity<>(new IndexResponseImpl.Response.BadRequest("Indexation already started."), HttpStatus.BAD_REQUEST);
     }
 }
 
