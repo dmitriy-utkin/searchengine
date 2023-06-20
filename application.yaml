@@ -17,13 +17,15 @@ spring:
 
 indexing-settings:
   sites:
-#    - url: https://www.skillbox.ru
-#      name: Skillbox
-#    - url: https://www.lenta.ru
-#      name: Лента.ру
+    - url: https://1c.ru
+      name: 1C
+    - url: https://ezo-restoran.ru
+      name: ЭЗО
+    - url: https://zdraste-schastie.ru
+      name: Здрасте счастье
 #    - url: https://skillbox.ru
 #      name: Skillbox
 #    - url: https://lenta.ru
 #      name: Лента.ру
-    - url: https://www.playback.ru
-      name: PlayBack.Ru
+#    - url: https://www.playback.ru
+#      name: PlayBack.Ru
