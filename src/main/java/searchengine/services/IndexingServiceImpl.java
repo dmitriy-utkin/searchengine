@@ -1,7 +1,6 @@
 package searchengine.services;
 
 import lombok.extern.slf4j.Slf4j;
-import net.bytebuddy.asm.MemberSubstitution;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -14,7 +13,6 @@ import searchengine.repository.SiteRepository;
 import java.io.IOException;
 import java.util.Date;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ForkJoinPool;
 
@@ -23,9 +21,9 @@ import java.util.concurrent.ForkJoinPool;
 public class IndexingServiceImpl implements IndexingService {
 
     @Override
-    public ResponseEntity<IndexResponseService> startIndexing(SitesList sitesList,
-                                                              SiteRepository siteRepository,
-                                                              PageRepository pageRepository) throws IOException {
+    public ResponseEntity<ResponseService> startIndexing(SitesList sitesList,
+                                                         SiteRepository siteRepository,
+                                                         PageRepository pageRepository) throws IOException {
 
         ConcurrentSkipListSet<String> preparedLinks;
         for (Site site : sitesList.getSites()) {
@@ -34,34 +32,36 @@ public class IndexingServiceImpl implements IndexingService {
             DBSite preparedSite;
             Optional<DBSite> dbSite = siteRepository.findByUrl(site.getUrl());
             if (dbSite.isPresent() && dbSite.get().getStatus().equals(Status.INDEXING)) {
-                return new ResponseEntity<>(new IndexResponseServiceImpl.Response.BadRequest("Indexation already started."), HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest("Indexation already started."), HttpStatus.BAD_REQUEST);
             }
             if (dbSite.isPresent() && dbSite.get().getStatus().equals(Status.INDEXED)) {
                 siteRepository.deleteById(dbSite.get().getId());
             }
             preparedSite = getDBSite(site);
+            siteRepository.save(preparedSite);
             siteUrl = preparedSite.getUrl();
-            log.info("\t\t\t\t->>>> " + siteUrl + " started");
+            log.info("\t-> " + siteUrl + " started");
+            launchSiteParserAction(new SiteParserAction(pageRepository, siteRepository, preparedSite, siteUrl, siteUrl));
             //TODO: пробросить внутрь парсера функционал от pageRepository?
-            preparedLinks = launchSiteParser(new SiteParser(siteUrl, siteUrl));
-
-            preparedLinks.forEach(page -> {
-                try {
-                    pageRepository.save(DBPage.builder()
-                                    .path(page.replace(siteUrl, ""))
-                                    .code(200)
-                                    .content("TEST TEXT")
-                                    .dbSite(preparedSite)
-                                    .build());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            });
+//            preparedLinks = launchSiteParser(new SiteParser(siteUrl, siteUrl));
+//
+//            preparedLinks.forEach(page -> {
+//                try {
+//                    pageRepository.save(DBPage.builder()
+//                                    .path(page.replace(siteUrl, ""))
+//                                    .code(200)
+//                                    .content("TEST TEXT")
+//                                    .dbSite(preparedSite)
+//                                    .build());
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            });
             preparedSite.setStatus(Status.INDEXED);
             siteRepository.save(preparedSite);
-            preparedLinks.clear();
+//            preparedLinks.clear();
         }
-        return new ResponseEntity<>(new IndexResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
+        return new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
     }
 
 
@@ -80,5 +80,18 @@ public class IndexingServiceImpl implements IndexingService {
     @Override
     public ConcurrentSkipListSet<String> launchSiteParser(SiteParser siteParser) {
         return new ForkJoinPool().invoke(siteParser);
+    }
+
+    public void launchSiteParserAction(SiteParserAction action) {
+        ForkJoinPool pool = new ForkJoinPool();
+        pool.execute(action);
+    }
+
+    public static class ParserLauncher implements Runnable{
+
+        @Override
+        public void run() {
+
+        }
     }
 }

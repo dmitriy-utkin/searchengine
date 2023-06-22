@@ -38,6 +38,8 @@ public class SiteParser extends RecursiveTask<ConcurrentSkipListSet> {
             e.printStackTrace();
         }
         List<SiteParser> tasksList = new ArrayList<>();
+
+
         Elements links = elementsCreator(documentCreator(url));
         if (isCorrectLink(url, rootUrl)) {
             preparedLinks.add(url);

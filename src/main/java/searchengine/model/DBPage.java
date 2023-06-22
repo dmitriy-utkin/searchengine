@@ -11,7 +11,7 @@ import javax.persistence.*;
 @EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "pages", indexes = {@Index(name = "path_site_index", columnList = "path, site_id", unique = true)})
+@Table(name = "pages", indexes = {@Index(name = "path_site_index", columnList = "site_id, path", unique = true)})
 public class DBPage {
 
     @Id
@@ -21,7 +21,7 @@ public class DBPage {
     @Column(name = "path", columnDefinition = "VARCHAR(255)", nullable = false)
     private String path;
 
-    @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
     private DBSite dbSite;
 

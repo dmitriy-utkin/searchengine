@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import searchengine.config.SitesList;
-import searchengine.services.IndexResponseService;
+import searchengine.services.ResponseService;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
@@ -42,7 +42,7 @@ public class ApiController {
     }
 
     @GetMapping("/startIndexing")
-    public ResponseEntity<IndexResponseService> startIndexing() throws IOException {
+    public ResponseEntity<ResponseService> startIndexing() throws IOException {
         return indexingService.startIndexing(sitesList, siteRepository, pageRepository);
     }
 }
