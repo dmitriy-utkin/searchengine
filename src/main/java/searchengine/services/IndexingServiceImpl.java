@@ -1,6 +1,9 @@
 package searchengine.services;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Connection;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -11,87 +14,106 @@ import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 
-@Service
 @Slf4j
+@Service
 public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public ResponseEntity<ResponseService> startIndexing(SitesList sitesList,
                                                          SiteRepository siteRepository,
-                                                         PageRepository pageRepository) throws IOException {
+                                                         PageRepository pageRepository){
 
-        ConcurrentSkipListSet<String> preparedLinks;
+        int countOfIndexedSite = sitesList.getSites().size() - 1;
+        DBSite preparedSite;
+
         for (Site site : sitesList.getSites()) {
-            //TODO: change the rules to use 'www' in yaml
-            String siteUrl;
-            DBSite preparedSite;
             Optional<DBSite> dbSite = siteRepository.findByUrl(site.getUrl());
-            if (dbSite.isPresent() && dbSite.get().getStatus().equals(Status.INDEXING)) {
-                return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest("Indexation already started."), HttpStatus.BAD_REQUEST);
+            if (dbSite.isEmpty()) {
+                countOfIndexedSite--;
+                siteRepository.save(createSiteEntry(site));
+            } else if (dbSite.get().getStatus().equals(Status.INDEXED)) {
+                preparedSite = dbSite.get();
+                preparedSite.setStatus(Status.INDEXING);
+                siteRepository.save(preparedSite);
+                pageRepository.deleteByDbSite(preparedSite);
+                countOfIndexedSite--;
             }
-            if (dbSite.isPresent() && dbSite.get().getStatus().equals(Status.INDEXED)) {
-                siteRepository.deleteById(dbSite.get().getId());
-            }
-            preparedSite = getDBSite(site);
-            siteRepository.save(preparedSite);
-            siteUrl = preparedSite.getUrl();
-            log.info("\t-> " + siteUrl + " started");
-            launchSiteParserAction(new SiteParserAction(pageRepository, siteRepository, preparedSite, siteUrl, siteUrl));
-            //TODO: пробросить внутрь парсера функционал от pageRepository?
-//            preparedLinks = launchSiteParser(new SiteParser(siteUrl, siteUrl));
-//
-//            preparedLinks.forEach(page -> {
-//                try {
-//                    pageRepository.save(DBPage.builder()
-//                                    .path(page.replace(siteUrl, ""))
-//                                    .code(200)
-//                                    .content("TEST TEXT")
-//                                    .dbSite(preparedSite)
-//                                    .build());
-//                } catch (Exception e) {
-//                    e.printStackTrace();
-//                }
-//            });
-            preparedSite.setStatus(Status.INDEXED);
-            siteRepository.save(preparedSite);
-//            preparedLinks.clear();
         }
-        return new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
+
+        //TODO: если уже что-то было проиндексировано, все равно запускается переиндексация даже на запущенный сайт. Переделать выбор сайтов для запуска индексации
+
+        Thread thread = new Thread(new IndexerThread(siteRepository, pageRepository, siteRepository.findAll()));
+        thread.start();
+
+        boolean response = countOfIndexedSite < sitesList.getSites().size() - 1;
+
+        return response ? new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK)
+                : new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest("Индексация уже запущена"), HttpStatus.BAD_REQUEST);
     }
 
+    static class IndexerThread implements Runnable{
 
-    @Override
-    public DBSite getDBSite(Site site) {
-        DBSite dbSite = new DBSite();
-        dbSite.setStatus(Status.INDEXING);
-        dbSite.setStatusTime(new Date());
-        dbSite.setName(site.getName());
-        dbSite.setUrl(site.getUrl());
-        return dbSite;
-    }
+        private SiteRepository siteRepository;
+        private PageRepository pageRepository;
+        private List<DBSite> sites;
 
-    //TODO: check if i can to delete the addition method from intrface (launcher of the Site Parser \|/
-
-    @Override
-    public ConcurrentSkipListSet<String> launchSiteParser(SiteParser siteParser) {
-        return new ForkJoinPool().invoke(siteParser);
-    }
-
-    public void launchSiteParserAction(SiteParserAction action) {
-        ForkJoinPool pool = new ForkJoinPool();
-        pool.execute(action);
-    }
-
-    public static class ParserLauncher implements Runnable{
+        public IndexerThread(SiteRepository siteRepository, PageRepository pageRepository, List<DBSite> sites) {
+            this.siteRepository = siteRepository;
+            this.pageRepository = pageRepository;
+            this.sites = sites;
+        }
 
         @Override
         public void run() {
-
+            for (DBSite site : sites) {
+                log.info("RUN for " + site.getUrl());
+                indexTask(siteRepository, pageRepository, site.getUrl(), site);
+            }
         }
     }
+
+    private static void indexTask(SiteRepository siteRepository, PageRepository pageRepository, String url, DBSite site) {
+        SiteParser task = new SiteParser(siteRepository, url, site, new ConcurrentHashMap<>());
+        ForkJoinPool pool = new ForkJoinPool();
+        ConcurrentHashMap<String, String> pages = pool.invoke(task);
+        pages.keySet().forEach(page -> {
+            try {
+                pageRepository.save(createPageEntry(site, page));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        site.setStatus(Status.INDEXED);
+        siteRepository.save(site);
+    }
+
+    private static DBPage createPageEntry(DBSite site, String url) throws IOException {
+        String rootUrl = site.getUrl();
+        Connection.Response response = Jsoup.connect(url)
+                .userAgent("Chrome/4.0.249.0 Safari/532.5")
+                .referrer("http://www.google.com")
+                .timeout(10_000)
+                .ignoreHttpErrors(true)
+                .followRedirects(false)
+                .execute();
+        Document doc = response.parse();
+        int statusCode = response.statusCode();
+        String content = doc.outerHtml();
+
+        return DBPage.builder()
+                .path(url.replace(rootUrl, ""))
+                .content(content)
+                .dbSite(site)
+                .code(statusCode)
+                .build();
+    }
+
+    private DBSite createSiteEntry(Site site) {
+        return DBSite.builder().status(Status.INDEXING).url(site.getUrl()).name(site.getName()).statusTime(new Date()).build();
+    }
+
 }

@@ -25,7 +25,7 @@ indexing-settings:
       name: Здрасте счастье
     - url: https://skillbox.ru
       name: Skillbox
-    - url: https://lenta.ru
-      name: Лента.ру
+#    - url: https://lenta.ru
+#      name: Лента.ру
     - url: https://www.playback.ru
       name: PlayBack.Ru

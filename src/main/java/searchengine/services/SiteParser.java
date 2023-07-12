@@ -1,105 +1,71 @@
 package searchengine.services;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import searchengine.model.DBSite;
+import searchengine.repository.SiteRepository;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.RecursiveTask;
+import java.util.concurrent.*;
 
 @Slf4j
-public class SiteParser extends RecursiveTask<ConcurrentSkipListSet> {
+public class SiteParser extends RecursiveTask<ConcurrentHashMap> {
 
+    private SiteRepository siteRepository;
     private String url;
-
+    private DBSite site;
+    private ConcurrentHashMap<String, String> pages;
     private String rootUrl;
-    private final String ATTRIBUTE_KEY = "href";
-    //TODO: check if I can to delete this regex ?
-//    private final String LINKS_REGEX = "https?://[a-z0-9]+-?[a-z0-9]*.[a-z0-9]{2,5}[^.#]*";
-    static ConcurrentSkipListSet<String> preparedLinks = new ConcurrentSkipListSet<>();
-    static ConcurrentSkipListSet<String> passedLinks = new ConcurrentSkipListSet<>();
 
-
-    public SiteParser(String url, String rootUrl) {
+    public SiteParser(SiteRepository siteRepository, String url, DBSite site, ConcurrentHashMap<String, String> pages) {
+        this.siteRepository = siteRepository;
         this.url = url;
-        this.rootUrl = rootUrl;
+        this.site = site;
+        this.pages = pages;
+        this.rootUrl = site.getUrl();
     }
 
     @Override
-    protected ConcurrentSkipListSet<String> compute() {
-
-        try {
-            Thread.sleep(200);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        List<SiteParser> tasksList = new ArrayList<>();
-
-
-        Elements links = elementsCreator(documentCreator(url));
-        if (isCorrectLink(url, rootUrl)) {
-            preparedLinks.add(url);
-        }
-        try {
-            if (links == null) {
-                preparedLinks.add(url);
-            } else {
-                for (Element element : links) {
-                    String childLink = element.absUrl(ATTRIBUTE_KEY);
-                    if (isCorrectLink(childLink, rootUrl)) {
-                        log.info("Added: " + preparedLinks.size() + " items is " + childLink);
-                        preparedLinks.add(childLink);
-                        SiteParser task = new SiteParser(childLink, rootUrl);
+    protected ConcurrentHashMap<String, String> compute() {
+        if (!pages.containsKey(url)) {
+            try {
+                Thread.sleep(100);
+                Connection.Response response = Jsoup.connect(url)
+                        .userAgent("Chrome/4.0.249.0 Safari/532.5")
+                        .referrer("http://www.google.com")
+                        .timeout(10_000)
+                        .ignoreHttpErrors(true)
+                        .followRedirects(false)
+                        .execute();
+                Document doc = response.parse();
+                pages.put(url, "1");
+                log.info(pages.size() + " size");
+                List<SiteParser> tasks = new ArrayList<>();
+                Elements elements = doc.select("a[href]");
+                for (Element element : elements) {
+                    String child = element.absUrl("href");
+                    if (child.startsWith(rootUrl) && (child.endsWith(".html"))) {
+//                        site.setStatusTime(new Date());
+//                        siteRepository.save(site);
+                        SiteParser task = new SiteParser(siteRepository, child, site, pages);
+                        tasks.add(task);
                         task.fork();
-                        tasksList.add(task);
-                    } else {
-                        passedLinks.add(childLink);
                     }
                 }
+
+                tasks.forEach(ForkJoinTask::join);
+
+            } catch (Exception e) {
+                pages.put(url, "0");
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
 
-        for (SiteParser task : tasksList) {
-            task.join();
-        }
-        return preparedLinks;
+        return pages;
     }
-    //TODO: add the functional of the updating the statusTime for sites here?
-
-    private boolean isCorrectLink(String childLink, String rootUrl) {
-        return childLink.startsWith(rootUrl)
-                //TODO: change the quality of checnking this links
-                && !preparedLinks.contains(childLink)
-                && (childLink.endsWith(".html") || childLink.endsWith("/") || childLink.endsWith("#"))
-                && !passedLinks.contains(childLink)
-                ;
-    }
-
-
-    private Document documentCreator(String url) {
-        try {
-            return Jsoup.connect(url).userAgent("Chrome/4.0.249.0 Safari/532.5")
-                    .referrer("http://www.google.com").timeout(10000)
-                    .get();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    private Elements elementsCreator(Document document) {
-        try {
-            return document.select("a[href]");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
 }

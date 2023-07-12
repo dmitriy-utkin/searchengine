@@ -3,6 +3,7 @@ package searchengine.model;
 import lombok.*;
 
 import javax.persistence.*;
+import javax.transaction.Transactional;
 import java.util.Date;
 
 @Entity
@@ -12,6 +13,7 @@ import java.util.Date;
 @EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor
+@Transactional
 @Table(name = "sites")
 public class DBSite {
 

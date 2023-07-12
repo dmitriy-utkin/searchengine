@@ -3,6 +3,7 @@ package searchengine.model;
 import lombok.*;
 
 import javax.persistence.*;
+import javax.transaction.Transactional;
 
 @Entity
 @Getter
@@ -11,6 +12,7 @@ import javax.persistence.*;
 @EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor
+@Transactional
 @Table(name = "pages", indexes = {@Index(name = "path_site_index", columnList = "site_id, path", unique = true)})
 public class DBPage {
 
