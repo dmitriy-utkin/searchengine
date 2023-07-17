@@ -15,7 +15,7 @@ import searchengine.repository.SiteRepository;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ForkJoinPool;
 
 @Slf4j
@@ -26,10 +26,8 @@ public class IndexingServiceImpl implements IndexingService {
     public ResponseEntity<ResponseService> startIndexing(SitesList sitesList,
                                                          SiteRepository siteRepository,
                                                          PageRepository pageRepository){
-
         int countOfIndexedSite = sitesList.getSites().size() - 1;
         DBSite preparedSite;
-
         for (Site site : sitesList.getSites()) {
             Optional<DBSite> dbSite = siteRepository.findByUrl(site.getUrl());
             if (dbSite.isEmpty()) {
@@ -55,6 +53,17 @@ public class IndexingServiceImpl implements IndexingService {
                 : new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest("Индексация уже запущена"), HttpStatus.BAD_REQUEST);
     }
 
+    @Override
+    public ResponseEntity<ResponseService> stopIndexing(SiteRepository siteRepository) {
+        boolean indexingInProcess = siteRepository.findByStatus(Status.INDEXING).size() > 0;
+        if (!indexingInProcess) {
+            return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest("Индексация не запущена"), HttpStatus.BAD_REQUEST);
+        } else {
+
+            return new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
+        }
+    }
+
     static class IndexerThread implements Runnable{
 
         private SiteRepository siteRepository;
@@ -71,24 +80,25 @@ public class IndexingServiceImpl implements IndexingService {
         public void run() {
             for (DBSite site : sites) {
                 log.info("RUN for " + site.getUrl());
-                indexTask(siteRepository, pageRepository, site.getUrl(), site);
+                indexTask(siteRepository, pageRepository, site);
             }
         }
     }
 
-    private static void indexTask(SiteRepository siteRepository, PageRepository pageRepository, String url, DBSite site) {
-        SiteParser task = new SiteParser(siteRepository, url, site, new ConcurrentHashMap<>());
+    private static void indexTask(SiteRepository siteRepository, PageRepository pageRepository,DBSite site) {
+        SiteParser task = new SiteParser(siteRepository, site.getUrl(), site.getUrl(), site);
         ForkJoinPool pool = new ForkJoinPool();
-        ConcurrentHashMap<String, String> pages = pool.invoke(task);
-        pages.keySet().forEach(page -> {
+        CopyOnWriteArraySet<String> links = pool.invoke(task);
+        links.forEach(link -> {
             try {
-                pageRepository.save(createPageEntry(site, page));
+                pageRepository.save(createPageEntry(site, link));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         });
         site.setStatus(Status.INDEXED);
         siteRepository.save(site);
+        links.clear();
     }
 
     private static DBPage createPageEntry(DBSite site, String url) throws IOException {

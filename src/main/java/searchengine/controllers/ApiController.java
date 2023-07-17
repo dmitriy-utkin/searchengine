@@ -42,8 +42,13 @@ public class ApiController {
     }
 
     @GetMapping("/startIndexing")
-    public ResponseEntity<ResponseService> startIndexing() throws IOException {
+    public ResponseEntity<ResponseService> startIndexing() {
         return indexingService.startIndexing(sitesList, siteRepository, pageRepository);
+    }
+
+    @GetMapping("/stopIndexing")
+    public ResponseEntity<ResponseService> stopIndexing() {
+        return indexingService.stopIndexing(siteRepository);
     }
 }
 

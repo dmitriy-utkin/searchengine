@@ -9,4 +9,6 @@ public interface IndexingService {
     ResponseEntity<ResponseService> startIndexing(SitesList sitesList,
                                                   SiteRepository siteRepository,
                                                   PageRepository pageRepository);
+
+    ResponseEntity<ResponseService> stopIndexing(SiteRepository siteRepository);
 }
