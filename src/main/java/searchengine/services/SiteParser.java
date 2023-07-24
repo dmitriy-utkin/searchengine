@@ -23,9 +23,8 @@ public class SiteParser extends RecursiveTask<CopyOnWriteArraySet> {
         this.url = url;
         this.rootUrl = rootUrl;
         this.site = site;
-//        site.setStatusTime(new Date());
-//        siteRepository.save(site);
     }
+
 
     @Override
     protected CopyOnWriteArraySet<String> compute() {
@@ -46,7 +45,7 @@ public class SiteParser extends RecursiveTask<CopyOnWriteArraySet> {
                 String child = link.absUrl("href");
                 if  (isCorrectLink(child, rootUrl)) {
                     SiteParser task = new SiteParser(siteRepository, child, site.getUrl(), site);
-                    log.info("Size: " + preparedLinks.size());
+//                    log.info("Size: " + preparedLinks.size());
                     task.fork();
                     tasks.add(task);
                 }
