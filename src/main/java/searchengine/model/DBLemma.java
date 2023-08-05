@@ -14,24 +14,22 @@ import javax.transaction.Transactional;
 @NoArgsConstructor
 @AllArgsConstructor
 @Transactional
-@Table(name = "pages", indexes = {@Index(name = "path_site_index", columnList = "site_id, path", unique = true)})
+@Table(name = "lemmas")
 @DependsOn("sites")
-public class DBPage {
+public class DBLemma {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
-    @Column(name = "path", columnDefinition = "VARCHAR(255)", nullable = false)
-    private String path;
-
     @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
     private DBSite dbSite;
 
-    @Column(nullable = false)
-    private int code;
+    @Column(name = "lemma", columnDefinition = "VARCHAR(255)", nullable = false)
+    private String lemma;
 
-    @Column(columnDefinition = "MEDIUMTEXT", nullable = false)
-    private String content;
+    @Column(name = "frequency", nullable = false)
+    private int frequency;
+
 }

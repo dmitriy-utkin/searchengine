@@ -27,8 +27,8 @@ indexing-settings:
       name: ЭЗО
     - url: https://zdraste-schastie.ru
       name: Здрасте счастье
-    - url: https://et-cetera.ru/mobile/
-      name: ET Cetera
+#    - url: https://et-cetera.ru/mobile/
+#      name: ET Cetera
 #    - url: https://skillbox.ru
 #      name: Skillbox
 #    - url: https://lenta.ru

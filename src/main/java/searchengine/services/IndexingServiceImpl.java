@@ -1,8 +1,8 @@
 package searchengine.services;
 
 import lombok.AllArgsConstructor;
-import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -12,9 +12,12 @@ import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.model.*;
+import searchengine.repository.IndexRepository;
+import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ForkJoinPool;
@@ -23,13 +26,21 @@ import java.util.concurrent.ForkJoinPool;
 @Service
 public class IndexingServiceImpl implements IndexingService {
 
+    private final String START_INDEXING_ERROR = "Индексация уже запущена";
+    private final String STOP_INDEXING_ERROR = "Индексация не запущена";
+    private final String INDEX_PAGE_ERROR = "Данная страница находится за пределами сайтов, указанных в конфигурационном файле";
+
     static boolean indexationIsRunning = false;
+    private LemmaFinder lemmaFinder = new LemmaFinder(new RussianLuceneMorphology());
+
+    public IndexingServiceImpl() throws IOException {
+    }
 
     @Override
     public ResponseEntity<ResponseService> startIndexing(SitesList sitesList, SiteRepository siteRepository, PageRepository pageRepository){
         DBSite preparedSite;
         if (siteRepository.findByStatus(Status.INDEXING).size() > 0) {
-            return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest("Индексация уже запущена"), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(START_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
         }
         indexationIsRunning = true;
         for (Site site : sitesList.getSites()) {
@@ -53,7 +64,7 @@ public class IndexingServiceImpl implements IndexingService {
     public ResponseEntity<ResponseService> stopIndexing(SiteRepository siteRepository) {
         boolean indexingInProcess = siteRepository.findByStatus(Status.INDEXING).size() > 0;
         if (!indexingInProcess) {
-            return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest("Индексация не запущена"), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(STOP_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
         } else {
             try {
                 indexationIsRunning = false;
@@ -69,6 +80,36 @@ public class IndexingServiceImpl implements IndexingService {
             }
             return new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
         }
+    }
+
+    @Override
+    public ResponseEntity<ResponseService> indexPage(SiteRepository siteRepository,
+                                                     PageRepository pageRepository,
+                                                     LemmaRepository lemmaRepository,
+                                                     IndexRepository indexRepository,
+                                                     String url) {
+
+        List<DBSite> siteList = siteRepository.findAll();
+        boolean pageIsLinkedToExistedSites = false;
+        DBPage dbPage = null;
+        DBSite dbSite = null;
+        for (DBSite site : siteList) {
+            if (url.contains(site.getUrl())) {
+                pageIsLinkedToExistedSites = true;
+                dbPage = createPageEntry(site, url);
+                dbSite = site;
+                pageRepository.save(dbPage);
+                break;
+            }
+        }
+        //TODO: добавить проверку на наличие сайта в конфигурационном файле
+        if (!pageIsLinkedToExistedSites) {
+            return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(INDEX_PAGE_ERROR), HttpStatus.BAD_REQUEST);
+        } else {
+            createLemmaAndIndex(dbSite, dbPage, dbPage.getContent(), lemmaRepository, indexRepository);
+        }
+
+        return new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
     }
 
     @AllArgsConstructor
@@ -104,6 +145,17 @@ public class IndexingServiceImpl implements IndexingService {
         }
     }
 
+    //TODO: добавляются одинаковые леммы, выглядит неправильно (нужно поменять, чтобы увеличивалось кол-во лемм?)
+    private void createLemmaAndIndex(DBSite site, DBPage page, String content, LemmaRepository lemmaRepository, IndexRepository indexRepository) {
+        Map<String, Integer> lemmas = lemmaFinder.collectLemmas(content);
+        for (String lemma : lemmas.keySet()) {
+            DBLemma dbLemma = createLemmaEntry(site, lemma, lemmas.get(lemma));
+            DBIndex dbIndex = createIndexEntry(page, dbLemma, 1);
+            lemmaRepository.save(dbLemma);
+            indexRepository.save(dbIndex);
+        }
+    }
+
     private static DBPage createPageEntry(DBSite site, String url) {
         try {
             String rootUrl = site.getUrl();
@@ -133,6 +185,22 @@ public class IndexingServiceImpl implements IndexingService {
                     .code(404)
                     .build();
         }
+    }
+
+    private static DBLemma createLemmaEntry(DBSite site, String lemma, int frequency) {
+        return DBLemma.builder()
+                .lemma(lemma)
+                .frequency(frequency)
+                .dbSite(site)
+                .build();
+    }
+
+    private static DBIndex createIndexEntry(DBPage page, DBLemma lemma, float rank) {
+        return DBIndex.builder()
+                .dbPage(page)
+                .dbLemma(lemma)
+                .rank(rank)
+                .build();
     }
 
     private DBSite createSiteEntry(Site site) {
