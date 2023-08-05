@@ -1,16 +1,19 @@
 package searchengine.model;
 
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import javax.persistence.*;
+import javax.transaction.Transactional;
 import java.util.Date;
 
 @Entity
 @Getter
 @Setter
+@Builder
 @EqualsAndHashCode
+@NoArgsConstructor
+@AllArgsConstructor
+@Transactional
 @Table(name = "sites")
 public class DBSite {
 
