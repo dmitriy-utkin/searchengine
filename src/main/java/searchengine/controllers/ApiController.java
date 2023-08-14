@@ -12,8 +12,6 @@ import searchengine.repository.SiteRepository;
 import searchengine.services.IndexingService;
 import searchengine.services.StatisticsService;
 
-import java.io.IOException;
-
 @RestController
 @RequestMapping("/api")
 public class ApiController {

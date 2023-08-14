@@ -96,9 +96,16 @@ public class IndexingServiceImpl implements IndexingService {
         for (DBSite site : siteList) {
             if (url.contains(site.getUrl())) {
                 pageIsLinkedToExistedSites = true;
-                dbPage = createPageEntry(site, url);
+                //TODO: error with a duplicate value for pages (when i add the same page in the second time)
                 dbSite = site;
-                pageRepository.save(dbPage);
+                Optional<DBPage> page = pageRepository.findByPath(url.replace(site.getUrl(), ""));
+                if (page.isPresent()) {
+                    //TODO: error when i delete the indexes due to the Lemma_id, check it it is error in the table architecture! Many-to-one? ore something another like more-to-more...
+                    indexRepository.deleteByDbPage(page.get());
+                    lemmaRepository.deleteByDbSite(dbSite);
+                    pageRepository.deleteById(page.get().getId());
+                }
+                dbPage = createPageEntry(site, url);
                 break;
             }
         }
@@ -106,9 +113,10 @@ public class IndexingServiceImpl implements IndexingService {
         if (!pageIsLinkedToExistedSites) {
             return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(INDEX_PAGE_ERROR), HttpStatus.BAD_REQUEST);
         } else {
+            //TODO: do not changed INDEXES and LEMMAS tables if it is the second and more relaunch of the page from the table
+            pageRepository.save(dbPage);
             createLemmaAndIndex(dbSite, dbPage, dbPage.getContent(), lemmaRepository, indexRepository);
         }
-
         return new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
     }
 
@@ -149,6 +157,7 @@ public class IndexingServiceImpl implements IndexingService {
     private void createLemmaAndIndex(DBSite site, DBPage page, String content, LemmaRepository lemmaRepository, IndexRepository indexRepository) {
         Map<String, Integer> lemmas = lemmaFinder.collectLemmas(content);
         for (String lemma : lemmas.keySet()) {
+            System.out.println(lemma);
             DBLemma dbLemma = createLemmaEntry(site, lemma, lemmas.get(lemma));
             DBIndex dbIndex = createIndexEntry(page, dbLemma, 1);
             lemmaRepository.save(dbLemma);
@@ -204,8 +213,11 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     private DBSite createSiteEntry(Site site) {
-
-        return DBSite.builder().status(Status.INDEXING).url(site.getUrl().endsWith("/") ? site.getUrl() : (site.getUrl() + "/")).name(site.getName()).statusTime(new Date()).build();
+        return DBSite.builder()
+                .status(Status.INDEXING)
+                .url(site.getUrl().endsWith("/") ? site.getUrl() : (site.getUrl() + "/"))
+                .name(site.getName())
+                .statusTime(new Date()).build();
     }
 
     private static void clearAllLists(CopyOnWriteArraySet list) {
