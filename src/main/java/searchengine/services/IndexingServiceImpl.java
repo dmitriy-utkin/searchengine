@@ -31,20 +31,30 @@ public class IndexingServiceImpl implements IndexingService {
     private final String INDEX_PAGE_ERROR = "Данная страница находится за пределами сайтов, указанных в конфигурационном файле";
 
     static boolean indexationIsRunning = false;
-    private LemmaFinder lemmaFinder = new LemmaFinder(new RussianLuceneMorphology());
+    private static LemmaFinder lemmaFinder;
 
-    public IndexingServiceImpl() throws IOException {
+    static {
+        try {
+            lemmaFinder = new LemmaFinder(new RussianLuceneMorphology());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
-    public ResponseEntity<ResponseService> startIndexing(SitesList sitesList, SiteRepository siteRepository, PageRepository pageRepository){
+    public ResponseEntity<ResponseService> startIndexing(SitesList sitesList,
+                                                         SiteRepository siteRepository,
+                                                         PageRepository pageRepository,
+                                                         LemmaRepository lemmaRepository,
+                                                         IndexRepository indexRepository){
         DBSite preparedSite;
         if (siteRepository.findByStatus(Status.INDEXING).size() > 0) {
             return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(START_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
         }
         indexationIsRunning = true;
         for (Site site : sitesList.getSites()) {
-            Optional<DBSite> dbSite = siteRepository.findByUrl(site.getUrl());
+            String siteUrl = site.getUrl().endsWith("/") ? site.getUrl() : site.getUrl() + "/";
+            Optional<DBSite> dbSite = siteRepository.findByUrl(siteUrl);
             if (dbSite.isEmpty()) {
                 preparedSite = createSiteEntry(site);
                 siteRepository.save(preparedSite);
@@ -52,12 +62,14 @@ public class IndexingServiceImpl implements IndexingService {
                 preparedSite = dbSite.get();
                 preparedSite.setStatus(Status.INDEXING);
                 siteRepository.save(preparedSite);
+                pageRepository.findByDbSite(preparedSite).forEach(indexRepository::deleteByDbPage);
+                lemmaRepository.deleteByDbSite(preparedSite);
                 pageRepository.deleteByDbSite(preparedSite);
             }
         }
-        Thread thread = new Thread(new IndexerLauncher(siteRepository, pageRepository, siteRepository.findAll()));
+        Thread thread = new Thread(new IndexerLauncher(siteRepository, pageRepository, lemmaRepository, indexRepository, siteRepository.findAll()));
         thread.start();
-        return new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
+        return new ResponseEntity<>(new ResponseServiceImpl.Response.IndexingSuccessResponseService(), HttpStatus.OK);
     }
 
     @Override
@@ -78,7 +90,7 @@ public class IndexingServiceImpl implements IndexingService {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            return new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
+            return new ResponseEntity<>(new ResponseServiceImpl.Response.IndexingSuccessResponseService(), HttpStatus.OK);
         }
     }
 
@@ -88,24 +100,27 @@ public class IndexingServiceImpl implements IndexingService {
                                                      LemmaRepository lemmaRepository,
                                                      IndexRepository indexRepository,
                                                      String url) {
-
+        String preparedUrl = url.toLowerCase().trim();
         List<DBSite> siteList = siteRepository.findAll();
         boolean pageIsLinkedToExistedSites = false;
         DBPage dbPage = null;
         DBSite dbSite = null;
         for (DBSite site : siteList) {
-            if (url.contains(site.getUrl())) {
+            if (preparedUrl.contains(site.getUrl())) {
                 pageIsLinkedToExistedSites = true;
                 //TODO: error with a duplicate value for pages (when i add the same page in the second time)
                 dbSite = site;
-                Optional<DBPage> page = pageRepository.findByPath(url.replace(site.getUrl(), ""));
+                Optional<DBPage> page = pageRepository.findByPathAndDbSite(preparedUrl.replace(site.getUrl(), ""), site);
                 if (page.isPresent()) {
+                    log.info("Started for " + page.get().getPath());
                     //TODO: error when i delete the indexes due to the Lemma_id, check it it is error in the table architecture! Many-to-one? ore something another like more-to-more...
                     indexRepository.deleteByDbPage(page.get());
-                    lemmaRepository.deleteByDbSite(dbSite);
+                    log.info("Found page: " + page.get().getPath() + "; " + page.get().getId());
+                    //TODO: ошибка с удалением (foreign key ...indexe... ) связана с тем, что удаляются леммы по сайту. Пробую убрать удаление из леммы, так как иначе нелдьзя удалить лемму по сайту, если она уже была проиндексирована
+//                    lemmaRepository.deleteByDbSite(dbSite);
                     pageRepository.deleteById(page.get().getId());
                 }
-                dbPage = createPageEntry(site, url);
+                dbPage = createPageEntry(site, preparedUrl);
                 break;
             }
         }
@@ -115,9 +130,9 @@ public class IndexingServiceImpl implements IndexingService {
         } else {
             //TODO: do not changed INDEXES and LEMMAS tables if it is the second and more relaunch of the page from the table
             pageRepository.save(dbPage);
-            createLemmaAndIndex(dbSite, dbPage, dbPage.getContent(), lemmaRepository, indexRepository);
+            createLemmaAndIndex(dbSite, dbPage, lemmaRepository, indexRepository);
         }
-        return new ResponseEntity<>(new ResponseServiceImpl.Response.SuccessResponseService(), HttpStatus.OK);
+        return new ResponseEntity<>(new ResponseServiceImpl.Response.IndexingSuccessResponseService(), HttpStatus.OK);
     }
 
     @AllArgsConstructor
@@ -125,6 +140,8 @@ public class IndexingServiceImpl implements IndexingService {
 
         private SiteRepository siteRepository;
         private PageRepository pageRepository;
+        private LemmaRepository lemmaRepository;
+        private IndexRepository indexRepository;
         private List<DBSite> sites;
 
         @Override
@@ -137,7 +154,11 @@ public class IndexingServiceImpl implements IndexingService {
                     clearAllLists(links);
                     links = pool.invoke(new SiteParser(siteRepository, site.getUrl(), site.getUrl(), site));
                     if (indexationIsRunning) {
-                        links.forEach(link -> pageRepository.save(createPageEntry(site, link)));
+                        links.forEach(link -> {
+                            DBPage page = createPageEntry(site, link);
+                            pageRepository.save(page);
+                            IndexingServiceImpl.createLemmaAndIndex(site, page, lemmaRepository, indexRepository);
+                        });
                         site.setStatus(Status.INDEXED);
                         clearAllLists(links);
                     } else {
@@ -154,14 +175,31 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     //TODO: добавляются одинаковые леммы, выглядит неправильно (нужно поменять, чтобы увеличивалось кол-во лемм?)
-    private void createLemmaAndIndex(DBSite site, DBPage page, String content, LemmaRepository lemmaRepository, IndexRepository indexRepository) {
-        Map<String, Integer> lemmas = lemmaFinder.collectLemmas(content);
-        for (String lemma : lemmas.keySet()) {
-            System.out.println(lemma);
-            DBLemma dbLemma = createLemmaEntry(site, lemma, lemmas.get(lemma));
-            DBIndex dbIndex = createIndexEntry(page, dbLemma, 1);
-            lemmaRepository.save(dbLemma);
-            indexRepository.save(dbIndex);
+    private static void createLemmaAndIndex(DBSite site,
+                                            DBPage page,
+                                            LemmaRepository lemmaRepository,
+                                            IndexRepository indexRepository) {
+        //TODO: проверка далее не убирает доп операцию по проверке в indexPage, то есть сначала все происходит/удаляется и тд там, и только потом доходит до этой проверке на "код")
+        if (String.valueOf(page.getCode()).startsWith("4") || String.valueOf(page.getCode()).startsWith("5")) {
+            log.info("Nothing to index for page " + page.getDbSite().getUrl() + page.getPath() + "; code is " + page.getCode());
+        } else {
+            Map<String, Integer> lemmas = lemmaFinder.collectLemmas(page.getContent());
+            log.info("Size of lemmas list: " + lemmas.size());
+            for (String lemma : lemmas.keySet()) {
+                log.info("Lemma: " + lemma);
+                Optional<DBLemma> existedLemma = lemmaRepository.findByDbSiteAndLemma(site, lemma);
+                DBLemma dbLemma;
+                if (existedLemma.isPresent()) {
+                    dbLemma = existedLemma.get();
+                    dbLemma.setFrequency(existedLemma.get().getFrequency() + 1);
+                } else {
+                    dbLemma = createLemmaEntry(site, lemma, 1);
+                }
+                DBIndex dbIndex = createIndexEntry(page, dbLemma, 1);
+                //TODO: переделать функцию добавления лемм, сейчас привязано под один метод (нет дополнительной проверки на входе, которая бы позволила увеличивать frequency по сайту???)
+                lemmaRepository.save(dbLemma);
+                indexRepository.save(dbIndex);
+            }
         }
     }
 
@@ -196,11 +234,12 @@ public class IndexingServiceImpl implements IndexingService {
         }
     }
 
+    //TODO: without frequency, changed a destination of freq initialization
     private static DBLemma createLemmaEntry(DBSite site, String lemma, int frequency) {
         return DBLemma.builder()
                 .lemma(lemma)
-                .frequency(frequency)
                 .dbSite(site)
+                .frequency(frequency)
                 .build();
     }
 

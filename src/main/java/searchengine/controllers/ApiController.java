@@ -41,13 +41,13 @@ public class ApiController {
     }
 
     @GetMapping("/statistics")
-    public ResponseEntity<StatisticsResponse> statistics() {
-        return ResponseEntity.ok(statisticsService.getStatistics());
+    public ResponseEntity<ResponseService> statistics() {
+        return statisticsService.getStatistics(siteRepository, pageRepository, lemmaRepository, indexRepository);
     }
 
     @GetMapping("/startIndexing")
     public ResponseEntity<ResponseService> startIndexing() {
-        return indexingService.startIndexing(sitesList, siteRepository, pageRepository);
+        return indexingService.startIndexing(sitesList, siteRepository, pageRepository, lemmaRepository, indexRepository);
     }
 
     @GetMapping("/stopIndexing")

@@ -21,12 +21,12 @@ indexing-settings:
 #      name: IP Fran
 #    - url: https://www.svetlovka.ru/
 #      name: Svetlovka
-    - url: https://1c.ru/
-      name: 1C
     - url: https://ezo-restoran.ru
       name: ЭЗО
     - url: https://zdraste-schastie.ru
       name: Здрасте счастье
+    - url: https://1c.ru/
+      name: 1C
 #    - url: https://et-cetera.ru/mobile/
 #      name: ET Cetera
 #    - url: https://skillbox.ru

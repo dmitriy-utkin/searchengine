@@ -10,7 +10,9 @@ import searchengine.repository.SiteRepository;
 public interface IndexingService {
     ResponseEntity<ResponseService> startIndexing(SitesList sitesList,
                                                   SiteRepository siteRepository,
-                                                  PageRepository pageRepository);
+                                                  PageRepository pageRepository,
+                                                  LemmaRepository lemmaRepository,
+                                                  IndexRepository indexRepository);
 
     ResponseEntity<ResponseService> stopIndexing(SiteRepository siteRepository);
     ResponseEntity<ResponseService> indexPage(SiteRepository siteRepository,

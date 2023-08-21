@@ -6,8 +6,14 @@ import org.springframework.transaction.annotation.Transactional;
 import searchengine.model.DBLemma;
 import searchengine.model.DBSite;
 
+import java.util.List;
+import java.util.Optional;
+
 @Repository
 @Transactional
 public interface LemmaRepository extends JpaRepository<DBLemma, Integer> {
     void deleteByDbSite(DBSite dbSite);
+    Optional<DBLemma> findByDbSiteAndLemma(DBSite dbSite, String lemma);
+    Optional<DBLemma> findByLemma(String lemma);
+    List<DBLemma> findByDbSite(DBSite dbSite);
 }
