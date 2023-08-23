@@ -12,12 +12,14 @@ public interface IndexingService {
                                                   SiteRepository siteRepository,
                                                   PageRepository pageRepository,
                                                   LemmaRepository lemmaRepository,
-                                                  IndexRepository indexRepository);
+                                                  IndexRepository indexRepository,
+                                                  LemmaFinder lemmaFinder);
 
     ResponseEntity<ResponseService> stopIndexing(SiteRepository siteRepository);
     ResponseEntity<ResponseService> indexPage(SiteRepository siteRepository,
                                               PageRepository pageRepository,
                                               LemmaRepository lemmaRepository,
                                               IndexRepository indexRepository,
-                                              String url);
+                                              String url,
+                                              LemmaFinder lemmaFinder);
 }

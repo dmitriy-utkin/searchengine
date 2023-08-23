@@ -1,16 +1,16 @@
 package searchengine.controllers;
 
+import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import searchengine.config.SitesList;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
-import searchengine.services.ResponseService;
-import searchengine.dto.statistics.StatisticsResponse;
+import searchengine.services.*;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
-import searchengine.services.IndexingService;
-import searchengine.services.StatisticsService;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api")
@@ -23,6 +23,8 @@ public class ApiController {
     private final IndexRepository indexRepository;
     private final LemmaRepository lemmaRepository;
     private final IndexingService indexingService;
+    private final LemmaFinder lemmaFinder;
+    private final SearchService searchService;
 
     public ApiController(StatisticsService statisticsService,
                          SitesList sitesList,
@@ -30,7 +32,8 @@ public class ApiController {
                          PageRepository pageRepository,
                          IndexRepository indexRepository,
                          LemmaRepository lemmaRepository,
-                         IndexingService indexingService) {
+                         IndexingService indexingService,
+                         SearchService searchService) throws IOException {
         this.statisticsService = statisticsService;
         this.sitesList = sitesList;
         this.siteRepository = siteRepository;
@@ -38,6 +41,8 @@ public class ApiController {
         this.indexRepository = indexRepository;
         this.lemmaRepository = lemmaRepository;
         this.indexingService = indexingService;
+        this.lemmaFinder = new LemmaFinder(new RussianLuceneMorphology());
+        this.searchService = searchService;
     }
 
     @GetMapping("/statistics")
@@ -47,7 +52,7 @@ public class ApiController {
 
     @GetMapping("/startIndexing")
     public ResponseEntity<ResponseService> startIndexing() {
-        return indexingService.startIndexing(sitesList, siteRepository, pageRepository, lemmaRepository, indexRepository);
+        return indexingService.startIndexing(sitesList, siteRepository, pageRepository, lemmaRepository, indexRepository, lemmaFinder);
     }
 
     @GetMapping("/stopIndexing")
@@ -57,7 +62,12 @@ public class ApiController {
 
     @PostMapping("/indexPage")
     public ResponseEntity<ResponseService> indexPage(@RequestParam String url) {
-        return indexingService.indexPage(siteRepository, pageRepository, lemmaRepository, indexRepository, url);
+        return indexingService.indexPage(siteRepository, pageRepository, lemmaRepository, indexRepository, url, lemmaFinder);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<ResponseService> search(@RequestParam String query) {
+        return searchService.search(query);
     }
 }
 

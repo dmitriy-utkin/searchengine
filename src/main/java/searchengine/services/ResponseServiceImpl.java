@@ -3,13 +3,8 @@ package searchengine.services;
 import com.sun.istack.NotNull;
 import jdk.jfr.BooleanFlag;
 import lombok.Value;
-import searchengine.dto.statistics.DetailedStatisticsItem;
+import searchengine.dto.search.SearchResult;
 import searchengine.dto.statistics.StatisticsData;
-import searchengine.dto.statistics.StatisticsResponse;
-import searchengine.model.DBSite;
-
-import java.util.List;
-import java.util.Map;
 
 public enum ResponseServiceImpl {;
 
@@ -25,15 +20,6 @@ public enum ResponseServiceImpl {;
             Boolean result;
         }
 
-        @Value public static class BadRequest implements ResponseService, Result, Error {
-            public BadRequest(String error) {
-                this.error = error;
-                this.result = false;
-            }
-            Boolean result;
-            String error;
-        }
-
         @Value public static class StatisticSuccessResponseService implements ResponseService, Result {
             public StatisticSuccessResponseService(StatisticsData statisticsData) {
                 this.statistics = statisticsData;
@@ -41,7 +27,28 @@ public enum ResponseServiceImpl {;
             }
             Boolean result;
             StatisticsData statistics;
+        }
 
+
+        //TODO: протестировать выдачу данных по data, есть подозрение, что отрабоатет некорректно
+        @Value public static class SearchSuccessResponseService implements ResponseService, Result {
+            public SearchSuccessResponseService(SearchResult searchResult) {
+                this.result = true;
+                this.count = searchResult.getData().size();
+                this.data = searchResult;
+            }
+            Boolean result;
+            int count;
+            SearchResult data;
+        }
+
+        @Value public static class BadRequest implements ResponseService, Result, Error {
+            public BadRequest(String error) {
+                this.error = error;
+                this.result = false;
+            }
+            Boolean result;
+            String error;
         }
 
     }

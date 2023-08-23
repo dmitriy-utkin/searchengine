@@ -9,7 +9,6 @@ import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.dto.statistics.DetailedStatisticsItem;
 import searchengine.dto.statistics.StatisticsData;
-import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.dto.statistics.TotalStatistics;
 import searchengine.model.DBSite;
 import searchengine.repository.IndexRepository;
@@ -32,13 +31,6 @@ public class StatisticsServiceImpl implements StatisticsService {
                                                          PageRepository pageRepository,
                                                          LemmaRepository lemmaRepository,
                                                          IndexRepository indexRepository) {
-//        String[] statuses = { "INDEXED", "FAILED", "INDEXING" };
-//        String[] errors = {
-//                "Ошибка индексации: главная страница сайта не доступна",
-//                "Ошибка индексации: сайт не доступен",
-//                ""
-//        };
-        StatisticsResponse statisticsResponse = new StatisticsResponse();
         StatisticsData statisticsData = new StatisticsData();
 
 

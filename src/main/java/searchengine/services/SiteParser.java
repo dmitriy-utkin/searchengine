@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class SiteParser extends RecursiveTask<CopyOnWriteArraySet> {
@@ -61,7 +60,7 @@ public class SiteParser extends RecursiveTask<CopyOnWriteArraySet> {
                 }
             });
         } catch (Exception e) {
-            log.error(e.getMessage() + " URL: " + url);
+            e.printStackTrace();
         }
         tasks.forEach(ForkJoinTask::join);
         return preparedLinks;
