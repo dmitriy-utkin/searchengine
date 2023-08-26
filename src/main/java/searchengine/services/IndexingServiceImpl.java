@@ -2,7 +2,6 @@ package searchengine.services;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -17,7 +16,6 @@ import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ForkJoinPool;
@@ -99,6 +97,7 @@ public class IndexingServiceImpl implements IndexingService {
         boolean pageIsLinkedToExistedSites = false;
         DBPage dbPage = null;
         DBSite dbSite = null;
+        //TODO: сделать проверку по siteList из конфигурационного сайта
         for (DBSite site : siteList) {
             if (preparedUrl.contains(site.getUrl())) {
                 pageIsLinkedToExistedSites = true;
@@ -253,7 +252,7 @@ public class IndexingServiceImpl implements IndexingService {
 
     private static void clearAllLists(CopyOnWriteArraySet list) {
         list.clear();
-        SiteParser.incorrectLink.clear();
+        SiteParser.incorrectLinks.clear();
         SiteParser.preparedLinks.clear();
     }
 

@@ -3,8 +3,10 @@ package searchengine.services;
 import com.sun.istack.NotNull;
 import jdk.jfr.BooleanFlag;
 import lombok.Value;
-import searchengine.dto.search.SearchResult;
+import searchengine.dto.search.SearchDataItem;
 import searchengine.dto.statistics.StatisticsData;
+
+import java.util.List;
 
 public enum ResponseServiceImpl {;
 
@@ -30,16 +32,15 @@ public enum ResponseServiceImpl {;
         }
 
 
-        //TODO: протестировать выдачу данных по data, есть подозрение, что отрабоатет некорректно
         @Value public static class SearchSuccessResponseService implements ResponseService, Result {
-            public SearchSuccessResponseService(SearchResult searchResult) {
+            public SearchSuccessResponseService(List<SearchDataItem> data) {
                 this.result = true;
-                this.count = searchResult.getData().size();
-                this.data = searchResult;
+                this.count = data.size();
+                this.data = data;
             }
             Boolean result;
             int count;
-            SearchResult data;
+            List<SearchDataItem> data;
         }
 
         @Value public static class BadRequest implements ResponseService, Result, Error {

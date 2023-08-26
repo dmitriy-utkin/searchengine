@@ -1,13 +1,11 @@
 package searchengine.services;
 
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.select.Elements;
 import searchengine.model.DBSite;
 import searchengine.repository.SiteRepository;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -15,9 +13,10 @@ import java.util.concurrent.*;
 public class SiteParser extends RecursiveTask<CopyOnWriteArraySet> {
 
     private SiteRepository siteRepository;
+    //TODO: добавить pageRepository
     private String url;
     volatile static CopyOnWriteArraySet<String> preparedLinks = new CopyOnWriteArraySet<>();
-    volatile static ConcurrentHashMap<String, String> incorrectLink = new ConcurrentHashMap<>();
+    volatile static ConcurrentHashMap<String, String> incorrectLinks = new ConcurrentHashMap<>();
     private String rootUrl;
     private DBSite site;
 
@@ -48,7 +47,7 @@ public class SiteParser extends RecursiveTask<CopyOnWriteArraySet> {
             preparedLinks.add(url);
             links.forEach(link -> {
                 String child = link.absUrl("href");
-                if  (!incorrectLink.containsKey(child) && isCorrectLink(child.toLowerCase(), rootUrl)) {
+                if  (!incorrectLinks.containsKey(child) && isCorrectLink(child.toLowerCase(), rootUrl)) {
                     SiteParser task = new SiteParser(siteRepository, child, site.getUrl(), site);
                     log.info("List size: " + preparedLinks.size());
 //                    site.setStatusTime(new Date());
@@ -56,7 +55,7 @@ public class SiteParser extends RecursiveTask<CopyOnWriteArraySet> {
                     task.fork();
                     tasks.add(task);
                 } else {
-                    incorrectLink.put(child, "");
+                    incorrectLinks.put(child, "");
                 }
             });
         } catch (Exception e) {
@@ -86,5 +85,4 @@ public class SiteParser extends RecursiveTask<CopyOnWriteArraySet> {
                 !url.contains("#") &&
                 !url.contains("?");
     }
-
 }

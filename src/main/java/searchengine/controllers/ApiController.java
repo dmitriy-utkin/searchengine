@@ -1,9 +1,12 @@
 package searchengine.controllers;
 
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
+import org.hibernate.annotations.Parameter;
+import org.springframework.data.repository.query.Param;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import searchengine.config.SitesList;
+import searchengine.model.DBSite;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.services.*;
@@ -66,8 +69,15 @@ public class ApiController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<ResponseService> search(@RequestParam String query) {
-        return searchService.search(query);
+    public ResponseEntity<ResponseService> search(@RequestParam String query,
+                                                  @RequestParam(required = false) DBSite dbSite,
+                                                  @RequestParam(required = false) Integer offset,
+                                                  @RequestParam(required = false) Integer limit) {
+        if (offset == null) offset = 0;
+        if (limit == null) limit = 20;
+
+        //TODO: проконтроллировать условие, что сайт идет без "/" в конце
+        return searchService.search(query, dbSite, offset, limit, lemmaFinder, siteRepository, pageRepository, lemmaRepository, indexRepository);
     }
 }
 
