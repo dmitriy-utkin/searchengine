@@ -4,8 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import searchengine.dto.indexing.LemmaDTO;
 import searchengine.dto.search.SearchDataItem;
+import searchengine.model.DBIndex;
 import searchengine.model.DBLemma;
 import searchengine.model.DBPage;
 import searchengine.model.DBSite;
@@ -20,9 +20,8 @@ import java.util.*;
 @Service
 public class SearchServiceImpl implements SearchService {
 
-    private final int MAX_LEMMA_FREQUENCY = 30;
-    private final int MIN_SIZE_OF_QUERY_TO_CLEAN = 3;
-    private final String EMPTY_QUERY_SEARCH_ERROR = "Задан пустой поисковый запрос";
+    private static final int MAX_LEMMA_FREQUENCY = 60;
+    private static final String EMPTY_QUERY_SEARCH_ERROR = "Задан пустой поисковый запрос";
 
 
     @Override
@@ -38,23 +37,8 @@ public class SearchServiceImpl implements SearchService {
         int pageCount = pageRepository.findAll().size();
         if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(EMPTY_QUERY_SEARCH_ERROR), HttpStatus.BAD_REQUEST);
 
-        //TODO: добавляется лемма, которой нет на сайте (к примеру? мыло)
-        Map<String, Integer> queryLemmas = lemmaFinder.collectLemmas(query.toLowerCase().trim());
-        List<String> lemmas = new ArrayList<>();
-        if (queryLemmas.size() >= MIN_SIZE_OF_QUERY_TO_CLEAN) {
-            for (String lemma : queryLemmas.keySet()) {
-                //TODO: не отрабатывает проверка, потому что "купить" все равно попадает в выборку. скорее всего нарушена логика в проверке ниже, потому что лемма не дублируется кучу раз, а повышается фреквенси
-                if (!((lemmaRepository.findByLemma(lemma).get().size() / pageCount) > MAX_LEMMA_FREQUENCY)) lemmas.add(lemma);
-            }
-        } else {
-            lemmas.addAll(queryLemmas.keySet());
-        }
-        List<String> preparedQueryLemmas = List.of(sortLemmas(lemmas, lemmaRepository).values().toString());
-        List<DBPage> pages = new ArrayList<>();
-        List<SearchDataItem> items = collectSearchDataItems(preparedQueryLemmas, pages, pageRepository);
-
-        preparedQueryLemmas.forEach(System.out::println);
-
+        List<DBLemma> preparedQueryLemmas = convertAndSortQueryToLemmasList(query, lemmaFinder, lemmaRepository, pageRepository);
+        List<DBPage> preparedPages = collectSearchDataItems(preparedQueryLemmas, new ArrayList<>(), indexRepository, pageRepository);
 
 //        for (int i = 1; i <= 100; i++) {
 //            SearchDataItem item = SearchDataItem.builder()
@@ -68,35 +52,68 @@ public class SearchServiceImpl implements SearchService {
 //            items.add(item);
 //        }
 
+        List<SearchDataItem> items = new ArrayList<>();
+
         return new ResponseEntity<>(new ResponseServiceImpl.Response.SearchSuccessResponseService(items), HttpStatus.OK);
     }
 
-    private static TreeMap<Integer, String> sortLemmas(List<String> lemmas, LemmaRepository lemmaRepository) {
-        TreeMap<Integer, String> lemmasMap = new TreeMap<>();
+    private static List <DBLemma> convertAndSortQueryToLemmasList(String query,
+                                                                 LemmaFinder lemmaFinder,
+                                                                 LemmaRepository lemmaRepository,
+                                                                 PageRepository pageRepository) {
+        List<String> lemmas = lemmaFinder.collectLemmas(query.toLowerCase().trim()).keySet().stream().toList();
+        TreeMap<Integer, List<DBLemma>> lemmasMap = new TreeMap<>();
+        List<DBLemma> dbLemmasList = new ArrayList<>();
         lemmas.forEach(lemma -> {
-            List<DBLemma> dbLemmas = lemmaRepository.findByLemma(lemma).get();
             int totalFrequency = 0;
-            for (DBLemma l : dbLemmas) {
-                totalFrequency = totalFrequency + l.getFrequency();
+            List<DBLemma> dbLemmas = lemmaRepository.findByLemma(lemma).isPresent() ? lemmaRepository.findByLemma(lemma).get() : null;
+            for (DBLemma dbLemma : dbLemmas) {
+                totalFrequency += dbLemma.getFrequency();
             }
-            lemmasMap.put(totalFrequency, lemma);
+            if ((totalFrequency / (double) pageRepository.findAll().size() * 100 < MAX_LEMMA_FREQUENCY) && totalFrequency > 0) lemmasMap.put(totalFrequency, dbLemmas);
         });
-
-        log.info("LEMMAS: " + lemmasMap);
-
-        return lemmasMap;
+        for (int key : lemmasMap.keySet()) {
+            dbLemmasList.addAll(lemmasMap.get(key));
+        }
+        return dbLemmasList;
     }
 
-    private static List<SearchDataItem> collectSearchDataItems(List<String> lemmas,
-                                                               List<DBPage> pages,
+    private static List<DBPage> collectSearchDataItems(List<DBLemma> lemmas,
+                                                               List<DBPage> inputDbPagesList,
+                                                               IndexRepository indexRepository,
                                                                PageRepository pageRepository) {
-        List<SearchDataItem> items = new ArrayList<>();
-        for (String lemma : lemmas) {
+        LinkedHashMap<DBPage, DBIndex> dbPageDbIndexMap = new LinkedHashMap<>();
+        LinkedHashMap<DBPage, Float> preparedResultDbPageAndAbsRelRelevant = new LinkedHashMap<>();
+        List<DBPage> outputDbPagesList = new ArrayList<>();
+        if (inputDbPagesList.size() == 0) {
 
         }
+        //TODO: check how it was found wrong lemma "танец" if on the page it is not exist
 
-        return items;
+        double maxAbs = 0D;
+        for (DBLemma lemma : lemmas) {
+            List<DBIndex> indexes = indexRepository.findByDbLemma(lemma).get();
+            for (DBIndex index : indexes) {
+                dbPageDbIndexMap.put(index.getDbPage(), index);
+                if (index.getRank() > maxAbs) maxAbs = index.getRank();
+                //TODo: проблема с последующим добавлением значений, как правильно получить данные, если уже есть одна зпасить, создастся дубликат? Или это правильно и нужно будет просто по ранжиру сортить вниз списка
+                preparedResultDbPageAndAbsRelRelevant.put(index.getDbPage(), index.getRank());
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        int count = 1;
+        for (DBPage page : dbPageDbIndexMap.keySet()) {
+            sb.append(count).append(": \n");
+            sb.append("Page id: ").append(page.getId()).append("; page url: ").append(page.getDbSite().getUrl()).append(page.getPath()).append("\n");
+            sb.append("Index (page id): ").append(dbPageDbIndexMap.get(page).getDbPage().getId()).append("; rank: ").append(dbPageDbIndexMap.get(page).getRank()).append("; lemma: ").append(dbPageDbIndexMap.get(page).getDbLemma().getLemma()).append(".\n------\n");
+            count++;
+        }
+        log.info(String.valueOf(sb));
+        return outputDbPagesList;
     }
+
+
+
 
 
 }

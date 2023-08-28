@@ -13,6 +13,7 @@ import java.util.Date;
 @EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = {"status", "statusTime", "lastError"})
 @Transactional
 @Table(name = "sites")
 public class DBSite {

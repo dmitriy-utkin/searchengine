@@ -33,5 +33,5 @@ indexing-settings:
 #      name: Skillbox
 #    - url: https://lenta.ru
 #      name: Лента.ру
-    - url: https://www.playback.ru
-      name: PlayBack
+#    - url: https://www.playback.ru
+#      name: PlayBack
