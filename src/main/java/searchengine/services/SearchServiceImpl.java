@@ -1,5 +1,6 @@
 package searchengine.services;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,24 +18,22 @@ import java.util.*;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SearchServiceImpl implements SearchService {
+
+    private final SiteRepository siteRepository;
+    private final PageRepository pageRepository;
+    private final LemmaRepository lemmaRepository;
+    private final IndexRepository indexRepository;
+    private final LemmaFinder lemmaFinder;
 
     private static final int MAX_LEMMA_FREQUENCY = 60;
     private static final String EMPTY_QUERY_SEARCH_ERROR = "Задан пустой поисковый запрос";
 
 
     @Override
-    public ResponseEntity<ResponseService> search(String query,
-                                                  DBSite dbSite,
-                                                  int offset,
-                                                  int limit,
-                                                  LemmaFinder lemmaFinder,
-                                                  SiteRepository siteRepository,
-                                                  PageRepository pageRepository,
-                                                  LemmaRepository lemmaRepository,
-                                                  IndexRepository indexRepository) {
-        int pageCount = pageRepository.findAll().size();
-        if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(EMPTY_QUERY_SEARCH_ERROR), HttpStatus.BAD_REQUEST);
+    public ResponseEntity<ResponseService> search(String query, DBSite dbSite, int offset, int limit) {
+        if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(EMPTY_QUERY_SEARCH_ERROR), HttpStatus.BAD_REQUEST);
 
         List<DBLemma> preparedQueryLemmas = convertAndSortQueryToLemmasList(query, lemmaFinder, lemmaRepository, pageRepository);
         List<DBPage> preparedPages = collectSearchDataItems(preparedQueryLemmas, 0, new ArrayList<>(), indexRepository, pageRepository);
@@ -58,7 +57,7 @@ public class SearchServiceImpl implements SearchService {
 
         List<SearchDataItem> items = new ArrayList<>();
 
-        return new ResponseEntity<>(new ResponseServiceImpl.Response.SearchSuccessResponseService(items), HttpStatus.OK);
+        return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
     }
 
     private static List <DBLemma> convertAndSortQueryToLemmasList(String query,

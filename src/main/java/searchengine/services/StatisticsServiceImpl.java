@@ -1,6 +1,5 @@
 package searchengine.services;
 
-import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,26 +10,24 @@ import searchengine.dto.statistics.DetailedStatisticsItem;
 import searchengine.dto.statistics.StatisticsData;
 import searchengine.dto.statistics.TotalStatistics;
 import searchengine.model.DBSite;
-import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
 public class StatisticsServiceImpl implements StatisticsService {
 
+    private final SiteRepository siteRepository;
+    private final PageRepository pageRepository;
+    private final LemmaRepository lemmaRepository;
     private final SitesList sites;
 
     @Override
-    public ResponseEntity<ResponseService> getStatistics(SiteRepository siteRepository,
-                                                         PageRepository pageRepository,
-                                                         LemmaRepository lemmaRepository,
-                                                         IndexRepository indexRepository) {
+    public ResponseEntity<ResponseService> getStatistics() {
         StatisticsData statisticsData = new StatisticsData();
 
 
@@ -63,6 +60,6 @@ public class StatisticsServiceImpl implements StatisticsService {
 
         statisticsData.setDetailed(detailedStatisticsItems);
 
-        return new ResponseEntity<>(new ResponseServiceImpl.Response.StatisticSuccessResponseService(statisticsData), HttpStatus.OK);
+        return new ResponseEntity<>(new ResponseServiceImpl.StatisticSuccessResponseService(statisticsData), HttpStatus.OK);
     }
 }

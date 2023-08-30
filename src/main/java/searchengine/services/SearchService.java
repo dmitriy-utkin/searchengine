@@ -8,13 +8,5 @@ import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
 public interface SearchService {
-    ResponseEntity<ResponseService> search(String query,
-                                           DBSite dbSite,
-                                           int offset,
-                                           int limit,
-                                           LemmaFinder lemmaFinder,
-                                           SiteRepository siteRepository,
-                                           PageRepository pageRepository,
-                                           LemmaRepository lemmaRepository,
-                                           IndexRepository indexRepository);
+    ResponseEntity<ResponseService> search(String query, DBSite dbSite, int offset, int limit);
 }

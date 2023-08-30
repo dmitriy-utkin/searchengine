@@ -1,6 +1,7 @@
 package searchengine.services;
 
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -22,7 +23,15 @@ import java.util.concurrent.ForkJoinPool;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class IndexingServiceImpl implements IndexingService {
+
+    private final SiteRepository siteRepository;
+    private final PageRepository pageRepository;
+    private final LemmaRepository lemmaRepository;
+    private final IndexRepository indexRepository;
+    private final LemmaFinder lemmaFinder;
+    private final SitesList sitesList;
 
     private final String START_INDEXING_ERROR = "Индексация уже запущена";
     private final String STOP_INDEXING_ERROR = "Индексация не запущена";
@@ -31,42 +40,30 @@ public class IndexingServiceImpl implements IndexingService {
     static boolean indexationIsRunning = false;
 
     @Override
-    public ResponseEntity<ResponseService> startIndexing(SitesList sitesList,
-                                                         SiteRepository siteRepository,
-                                                         PageRepository pageRepository,
-                                                         LemmaRepository lemmaRepository,
-                                                         IndexRepository indexRepository,
-                                                         LemmaFinder lemmaFinder){
-        DBSite preparedSite;
+    public ResponseEntity<ResponseService> startIndexing(){
         if (siteRepository.existByStatus(Status.INDEXING)) {
-            return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(START_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(START_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
         }
         indexationIsRunning = true;
+        clearDataBase();
         for (Site site : sitesList.getSites()) {
-            String siteUrl = prepareSiteUrl(site.getUrl());
-            Optional<DBSite> dbSite = siteRepository.findByUrl(siteUrl);
-            if (dbSite.isEmpty()) {
-                preparedSite = createSiteEntry(site);
-                siteRepository.save(preparedSite);
-            } else {
-                //TODO: check if the below option is not need
-//            } else if (!dbSite.get().getStatus().equals(Status.INDEXED) || dbSite.get().getStatus().equals(Status.FAILED)) {
-                preparedSite = dbSite.get();
-                preparedSite.setStatus(Status.INDEXING);
-                siteRepository.save(preparedSite);
-                pageRepository.findByDbSite(preparedSite).forEach(indexRepository::deleteByDbPage);
-                lemmaRepository.deleteByDbSite(preparedSite);
-                pageRepository.deleteByDbSite(preparedSite);
-            }
+            siteRepository.save(createSiteEntry(site));
         }
-        Thread thread = new Thread(new IndexerLauncher(siteRepository, pageRepository, lemmaRepository, indexRepository, siteRepository.findAll(), lemmaFinder));
+        siteRepository.findAll().forEach(dbSite -> {
+            new Thread(() -> new ForkJoinPool().invoke(
+                    //TODO: add a site ID!!!!!
+                    new SiteParser(siteRepository, dbSite.getId(), )
+            ));
+        });
+
+        Thread thread = new Thread(new IndexerLauncher(siteRepository, pageRepository, siteRepository.findAll()));
         thread.start();
-        return new ResponseEntity<>(new ResponseServiceImpl.Response.IndexingSuccessResponseService(), HttpStatus.OK);
+        return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
     }
 
     @Override
-    public ResponseEntity<ResponseService> stopIndexing(SiteRepository siteRepository) {
-        if (!siteRepository.existByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(STOP_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
+    public ResponseEntity<ResponseService> stopIndexing() {
+        if (!siteRepository.existByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(STOP_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
         else {
             try {
                 indexationIsRunning = false;
@@ -80,17 +77,12 @@ public class IndexingServiceImpl implements IndexingService {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            return new ResponseEntity<>(new ResponseServiceImpl.Response.IndexingSuccessResponseService(), HttpStatus.OK);
+            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
         }
     }
 
     @Override
-    public ResponseEntity<ResponseService> indexPage(SiteRepository siteRepository,
-                                                     PageRepository pageRepository,
-                                                     LemmaRepository lemmaRepository,
-                                                     IndexRepository indexRepository,
-                                                     String url,
-                                                     LemmaFinder lemmaFinder) {
+    public ResponseEntity<ResponseService> indexPage(String url) {
         String preparedUrl = url.toLowerCase().trim();
         List<DBSite> siteList = siteRepository.findAll();
         boolean pageIsLinkedToExistedSites = false;
@@ -118,24 +110,21 @@ public class IndexingServiceImpl implements IndexingService {
         }
         //TODO: добавить проверку на наличие сайта в конфигурационном файле
         if (!pageIsLinkedToExistedSites) {
-            return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(INDEX_PAGE_ERROR), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(INDEX_PAGE_ERROR), HttpStatus.BAD_REQUEST);
         } else {
             //TODO: do not changed INDEXES and LEMMAS tables if it is the second and more relaunch of the page from the table
             pageRepository.save(dbPage);
-            createLemmaAndIndex(dbSite, dbPage, lemmaRepository, indexRepository, lemmaFinder);
+            createLemmaAndIndex(dbSite, dbPage);
         }
-        return new ResponseEntity<>(new ResponseServiceImpl.Response.IndexingSuccessResponseService(), HttpStatus.OK);
+        return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
     }
 
     @AllArgsConstructor
-    static class IndexerLauncher implements Runnable{
+    public class IndexerLauncher implements Runnable{
 
         private SiteRepository siteRepository;
         private PageRepository pageRepository;
-        private LemmaRepository lemmaRepository;
-        private IndexRepository indexRepository;
         private List<DBSite> sites;
-        private LemmaFinder lemmaFinder;
 
         @Override
         public void run() {
@@ -149,7 +138,7 @@ public class IndexingServiceImpl implements IndexingService {
                         links.forEach(link -> {
                             DBPage page = createPageEntry(site, link);
                             pageRepository.save(page);
-                            IndexingServiceImpl.createLemmaAndIndex(site, page, lemmaRepository, indexRepository, lemmaFinder);
+                            createLemmaAndIndex(site, page);
                         });
                         site.setStatus(Status.INDEXED);
                         clearAllLists(links);
@@ -166,11 +155,7 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     //TODO: добавляются одинаковые леммы, выглядит неправильно (нужно поменять, чтобы увеличивалось кол-во лемм?)
-    private static void createLemmaAndIndex(DBSite site,
-                                            DBPage page,
-                                            LemmaRepository lemmaRepository,
-                                            IndexRepository indexRepository,
-                                            LemmaFinder lemmaFinder) {
+    private void createLemmaAndIndex(DBSite site, DBPage page) {
         List<DBLemma> dbLemmas = new ArrayList<>();
         List<DBIndex> dbIndexes = new ArrayList<>();
         //TODO: не выполняется остановка добавления в базу данных в случае стопИндексинг (если вставить проверку в лоб - будет ошибка
@@ -197,6 +182,7 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     private static DBPage createPageEntry(DBSite site, String url) {
+        int statusCode = 0;
         try {
             String rootUrl = site.getUrl();
             Connection.Response response = Jsoup.connect(url)
@@ -206,10 +192,9 @@ public class IndexingServiceImpl implements IndexingService {
                     .ignoreHttpErrors(true)
                     .followRedirects(false)
                     .execute();
+            statusCode = response.statusCode();
             Document doc = response.parse();
-            int statusCode = response.statusCode();
             String content = doc.outerHtml();
-
             return DBPage.builder()
                     .path(url.replace(rootUrl, ""))
                     .content(content)
@@ -220,9 +205,9 @@ public class IndexingServiceImpl implements IndexingService {
             log.error(e.getMessage());
             return DBPage.builder()
                     .path(url.replace(site.getUrl(), ""))
-                    .content("BAD REQUEST")
+                    .content("")
                     .dbSite(site)
-                    .code(404)
+                    .code(statusCode)
                     .build();
         }
     }
@@ -259,6 +244,14 @@ public class IndexingServiceImpl implements IndexingService {
 
     private String prepareSiteUrl(String url) {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
+    private void clearDataBase() {
+        indexRepository.deleteAllInBatch();
+        lemmaRepository.deleteAllInBatch();
+        pageRepository.deleteAllInBatch();
+        siteRepository.deleteAllInBatch();
+        log.info("All info was removed.");
     }
 
 }

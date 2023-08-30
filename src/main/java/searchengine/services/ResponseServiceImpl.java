@@ -13,8 +13,6 @@ public enum ResponseServiceImpl {;
     private interface Result{@BooleanFlag Boolean getResult(); }
     private interface Error{@NotNull String getError(); }
 
-    public enum Response {;
-
         @Value public static class IndexingSuccessResponseService implements ResponseService, Result {
             public IndexingSuccessResponseService() {
                 this.result = true;
@@ -30,7 +28,6 @@ public enum ResponseServiceImpl {;
             Boolean result;
             StatisticsData statistics;
         }
-
 
         @Value public static class SearchSuccessResponseService implements ResponseService, Result {
             public SearchSuccessResponseService(List<SearchDataItem> data) {
@@ -51,7 +48,4 @@ public enum ResponseServiceImpl {;
             Boolean result;
             String error;
         }
-
-    }
-
 }
