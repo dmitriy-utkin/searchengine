@@ -45,7 +45,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         List<DetailedStatisticsItem> detailedStatisticsItems = new ArrayList<>();
         List<Site> siteList = sites.getSites();
         for (Site site : siteList) {
-            String url = site.getUrl().endsWith("/") ? site.getUrl() : site.getUrl() + "/";
+            String url = site.getUrl().endsWith("/") ? site.getUrl().substring(0, site.getUrl().length() - 1) : site.getUrl();
             DBSite dbSite = siteRepository.findByUrl(url).isPresent() ? siteRepository.findByUrl(url).get() : null;
             if (dbSite != null) {
                 DetailedStatisticsItem item = DetailedStatisticsItem.builder()

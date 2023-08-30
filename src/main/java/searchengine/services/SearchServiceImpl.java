@@ -5,7 +5,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import searchengine.dto.search.SearchDataItem;
-import searchengine.model.DBIndex;
 import searchengine.model.DBLemma;
 import searchengine.model.DBPage;
 import searchengine.model.DBSite;
@@ -38,7 +37,12 @@ public class SearchServiceImpl implements SearchService {
         if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(EMPTY_QUERY_SEARCH_ERROR), HttpStatus.BAD_REQUEST);
 
         List<DBLemma> preparedQueryLemmas = convertAndSortQueryToLemmasList(query, lemmaFinder, lemmaRepository, pageRepository);
-        List<DBPage> preparedPages = collectSearchDataItems(preparedQueryLemmas, new ArrayList<>(), indexRepository, pageRepository);
+        List<DBPage> preparedPages = collectSearchDataItems(preparedQueryLemmas, 0, new ArrayList<>(), indexRepository, pageRepository);
+        StringBuilder sb = new StringBuilder();
+        preparedPages.forEach(page -> {
+            sb.append("ID: ").append(page.getId()).append("; path: ").append(page.getPath()).append(";\n");
+        });
+        log.info(sb.toString());
 
 //        for (int i = 1; i <= 100; i++) {
 //            SearchDataItem item = SearchDataItem.builder()
@@ -79,37 +83,20 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private static List<DBPage> collectSearchDataItems(List<DBLemma> lemmas,
-                                                               List<DBPage> inputDbPagesList,
-                                                               IndexRepository indexRepository,
-                                                               PageRepository pageRepository) {
-        LinkedHashMap<DBPage, DBIndex> dbPageDbIndexMap = new LinkedHashMap<>();
-        LinkedHashMap<DBPage, Float> preparedResultDbPageAndAbsRelRelevant = new LinkedHashMap<>();
-        List<DBPage> outputDbPagesList = new ArrayList<>();
-        if (inputDbPagesList.size() == 0) {
+                                                       int lemmaIndex,
+                                                       List<DBPage> result,
+                                                       IndexRepository indexRepository,
+                                                       PageRepository pageRepository) {
 
-        }
-        //TODO: check how it was found wrong lemma "танец" if on the page it is not exist
-
-        double maxAbs = 0D;
-        for (DBLemma lemma : lemmas) {
-            List<DBIndex> indexes = indexRepository.findByDbLemma(lemma).get();
-            for (DBIndex index : indexes) {
-                dbPageDbIndexMap.put(index.getDbPage(), index);
-                if (index.getRank() > maxAbs) maxAbs = index.getRank();
-                //TODo: проблема с последующим добавлением значений, как правильно получить данные, если уже есть одна зпасить, создастся дубликат? Или это правильно и нужно будет просто по ранжиру сортить вниз списка
-                preparedResultDbPageAndAbsRelRelevant.put(index.getDbPage(), index.getRank());
-            }
-        }
-        StringBuilder sb = new StringBuilder();
-        int count = 1;
-        for (DBPage page : dbPageDbIndexMap.keySet()) {
-            sb.append(count).append(": \n");
-            sb.append("Page id: ").append(page.getId()).append("; page url: ").append(page.getDbSite().getUrl()).append(page.getPath()).append("\n");
-            sb.append("Index (page id): ").append(dbPageDbIndexMap.get(page).getDbPage().getId()).append("; rank: ").append(dbPageDbIndexMap.get(page).getRank()).append("; lemma: ").append(dbPageDbIndexMap.get(page).getDbLemma().getLemma()).append(".\n------\n");
-            count++;
-        }
-        log.info(String.valueOf(sb));
-        return outputDbPagesList;
+        if (lemmaIndex >= lemmas.size() - 1) return result;
+        List<DBPage> pages = new ArrayList<>();
+        indexRepository.findByDbLemma(lemmas.get(lemmaIndex)).get().forEach(index -> pages.add(index.getDbPage()));
+        if (result.size() == 0) result.addAll(pages);
+        else pages.forEach(page -> {
+            if (!result.contains(page)) result.remove(page);
+        });
+        collectSearchDataItems(lemmas, lemmaIndex + 1, result, indexRepository, pageRepository);
+        return result;
     }
 
 

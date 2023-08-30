@@ -14,4 +14,5 @@ import java.util.Optional;
 public interface SiteRepository extends JpaRepository<DBSite, Integer> {
     Optional<DBSite> findByUrl(String url);
     List<DBSite> findByStatus(Status status);
+    Boolean existByStatus(Status status);
 }

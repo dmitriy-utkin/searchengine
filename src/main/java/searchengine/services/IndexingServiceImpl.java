@@ -38,18 +38,19 @@ public class IndexingServiceImpl implements IndexingService {
                                                          IndexRepository indexRepository,
                                                          LemmaFinder lemmaFinder){
         DBSite preparedSite;
-        if (siteRepository.findByStatus(Status.INDEXING).size() > 0) {
+        if (siteRepository.existByStatus(Status.INDEXING)) {
             return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(START_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
         }
         indexationIsRunning = true;
         for (Site site : sitesList.getSites()) {
-            //TODO: поправить логику с сохранением адреса сайта с "/" в конце (при этом изменить логику сохранения page.path -> сейчас без "/" в начале адреса
-            String siteUrl = site.getUrl().endsWith("/") ? site.getUrl() : site.getUrl() + "/";
+            String siteUrl = prepareSiteUrl(site.getUrl());
             Optional<DBSite> dbSite = siteRepository.findByUrl(siteUrl);
             if (dbSite.isEmpty()) {
                 preparedSite = createSiteEntry(site);
                 siteRepository.save(preparedSite);
-            } else if (dbSite.get().getStatus().equals(Status.INDEXED) || dbSite.get().getStatus().equals(Status.FAILED)) {
+            } else {
+                //TODO: check if the below option is not need
+//            } else if (!dbSite.get().getStatus().equals(Status.INDEXED) || dbSite.get().getStatus().equals(Status.FAILED)) {
                 preparedSite = dbSite.get();
                 preparedSite.setStatus(Status.INDEXING);
                 siteRepository.save(preparedSite);
@@ -65,10 +66,8 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public ResponseEntity<ResponseService> stopIndexing(SiteRepository siteRepository) {
-        boolean indexingInProcess = siteRepository.findByStatus(Status.INDEXING).size() > 0;
-        if (!indexingInProcess) {
-            return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(STOP_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
-        } else {
+        if (!siteRepository.existByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.Response.BadRequest(STOP_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
+        else {
             try {
                 indexationIsRunning = false;
                 List<DBSite> sites = siteRepository.findByStatus(Status.INDEXING);
@@ -106,7 +105,6 @@ public class IndexingServiceImpl implements IndexingService {
                 Optional<DBPage> page = pageRepository.findByPathAndDbSite(preparedUrl.replace(site.getUrl(), ""), site);
                 if (page.isPresent()) {
                     log.info("Started for " + page.get().getPath());
-                    //TODO: error when i delete the indexes due to the Lemma_id, check it it is error in the table architecture! Many-to-one? ore something another like more-to-more...
                     indexRepository.deleteByDbPage(page.get());
                     log.info("Found page: " + page.get().getPath() + "; " + page.get().getId());
                     //TODO: if i add https://1c.ru (without "/" at the end of the site url) it will be error due to the sites in db with "/" at the end
@@ -143,7 +141,6 @@ public class IndexingServiceImpl implements IndexingService {
         public void run() {
             sites.forEach(site -> {
                 if (indexationIsRunning) {
-                    log.info("RUN for " + site.getUrl() + " in thread " + Thread.currentThread().getName());
                     ForkJoinPool pool = new ForkJoinPool();
                     CopyOnWriteArraySet<String> links = new CopyOnWriteArraySet<>();
                     clearAllLists(links);
@@ -174,10 +171,12 @@ public class IndexingServiceImpl implements IndexingService {
                                             LemmaRepository lemmaRepository,
                                             IndexRepository indexRepository,
                                             LemmaFinder lemmaFinder) {
+        List<DBLemma> dbLemmas = new ArrayList<>();
+        List<DBIndex> dbIndexes = new ArrayList<>();
+        //TODO: не выполняется остановка добавления в базу данных в случае стопИндексинг (если вставить проверку в лоб - будет ошибка
         //TODO: проверка далее не убирает доп операцию по проверке в indexPage, то есть сначала все происходит/удаляется и тд там, и только потом доходит до этой проверке на "код")
         if (!(String.valueOf(page.getCode()).startsWith("4") || String.valueOf(page.getCode()).startsWith("5"))) {
             Map<String, Integer> lemmas = lemmaFinder.collectLemmas(page.getContent());
-            log.info("Size of lemmas list: " + lemmas.size());
             for (String lemma : lemmas.keySet()) {
                 Optional<DBLemma> existedLemma = lemmaRepository.findByDbSiteAndLemma(site, lemma);
                 DBLemma dbLemma;
@@ -188,9 +187,11 @@ public class IndexingServiceImpl implements IndexingService {
                     dbLemma = createLemmaEntry(site, lemma);
                 }
                 DBIndex dbIndex = createIndexEntry(page, dbLemma, lemmas.get(lemma));
+                dbLemmas.add(dbLemma);
+                dbIndexes.add(dbIndex);
                 //TODO: переделать функцию добавления лемм, сейчас привязано под один метод (нет дополнительной проверки на входе, которая бы позволила увеличивать frequency по сайту???)
-                lemmaRepository.save(dbLemma);
-                indexRepository.save(dbIndex);
+                lemmaRepository.saveAll(dbLemmas);
+                indexRepository.saveAll(dbIndexes);
             }
         }
     }
@@ -245,7 +246,7 @@ public class IndexingServiceImpl implements IndexingService {
     private DBSite createSiteEntry(Site site) {
         return DBSite.builder()
                 .status(Status.INDEXING)
-                .url(site.getUrl().endsWith("/") ? site.getUrl() : (site.getUrl() + "/"))
+                .url(prepareSiteUrl(site.getUrl()))
                 .name(site.getName())
                 .statusTime(new Date()).build();
     }
@@ -254,6 +255,10 @@ public class IndexingServiceImpl implements IndexingService {
         list.clear();
         SiteParser.incorrectLinks.clear();
         SiteParser.preparedLinks.clear();
+    }
+
+    private String prepareSiteUrl(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
 }
