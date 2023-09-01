@@ -1,4 +1,4 @@
-package searchengine.services;
+package searchengine.services.statistics;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -13,6 +13,9 @@ import searchengine.model.DBSite;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
+import searchengine.services.response.ResponseService;
+import searchengine.services.response.ResponseServiceImpl;
+import searchengine.services.indexing.IndexingServiceImpl;
 
 import java.util.ArrayList;
 import java.util.List;

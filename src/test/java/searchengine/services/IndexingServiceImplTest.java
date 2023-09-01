@@ -6,8 +6,7 @@ import org.junit.jupiter.api.Test;
 import searchengine.config.Site;
 import searchengine.model.DBSite;
 import searchengine.model.Status;
-
-import java.util.Date;
+import searchengine.services.indexing.IndexingServiceImpl;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 

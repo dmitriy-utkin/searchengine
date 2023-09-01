@@ -1,6 +1,7 @@
-package searchengine.services;
+package searchengine.services.indexing;
 
 import org.springframework.http.ResponseEntity;
+import searchengine.services.response.ResponseService;
 
 public interface IndexingService {
     ResponseEntity<ResponseService> startIndexing();

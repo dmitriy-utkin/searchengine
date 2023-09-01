@@ -1,20 +1,24 @@
-package searchengine.services;
+package searchengine.services.indexing;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.morphology.LuceneMorphology;
+import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.jsoup.Jsoup;
+import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Slf4j
+@Component
 public class LemmaFinder {
     private final LuceneMorphology luceneMorphology;
     private static final String[] particlesNames = new String[]{"МЕЖД", "ПРЕДЛ", "СОЮЗ"};
 
-    public LemmaFinder(LuceneMorphology luceneMorphology) {
-        this.luceneMorphology = luceneMorphology;
+    public LemmaFinder() throws IOException {
+        this.luceneMorphology = new RussianLuceneMorphology();
     }
 
     public Map<String, Integer> collectLemmas(String content) {

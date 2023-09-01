@@ -1,4 +1,4 @@
-package searchengine.services;
+package searchengine.services.response;
 
 import com.sun.istack.NotNull;
 import jdk.jfr.BooleanFlag;

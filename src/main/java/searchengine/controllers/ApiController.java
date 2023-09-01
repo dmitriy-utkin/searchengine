@@ -4,7 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import searchengine.model.DBSite;
-import searchengine.services.*;
+import searchengine.services.indexing.IndexingService;
+import searchengine.services.response.ResponseService;
+import searchengine.services.search.SearchService;
+import searchengine.services.statistics.StatisticsService;
 
 @RestController
 @RequestMapping("/api")
@@ -34,6 +37,7 @@ public class ApiController {
     public ResponseEntity<ResponseService> indexPage(@RequestParam String url) {
         return indexingService.indexPage(url);
     }
+
 
     @GetMapping("/search")
     public ResponseEntity<ResponseService> search(@RequestParam String query,

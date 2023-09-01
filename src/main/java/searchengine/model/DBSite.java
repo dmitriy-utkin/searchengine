@@ -1,6 +1,7 @@
 package searchengine.model;
 
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 
 import javax.persistence.*;
 import javax.transaction.Transactional;
@@ -16,6 +17,7 @@ import java.util.Date;
 @ToString(exclude = {"status", "statusTime", "lastError"})
 @Transactional
 @Table(name = "sites")
+@DynamicUpdate
 public class DBSite {
 
     @Id
