@@ -55,7 +55,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                         .statusTime(dbSite.getStatusTime().getTime())
                         .error(dbSite.getLastError())
                         .pages(pageRepository.findByDbSite(dbSite).size())
-                        .lemmas(lemmaRepository.findByDbSite(dbSite).size())
+                        .lemmas(lemmaRepository.findAllByDbSite(dbSite).size())
                         .build();
                 detailedStatisticsItems.add(item);
             }

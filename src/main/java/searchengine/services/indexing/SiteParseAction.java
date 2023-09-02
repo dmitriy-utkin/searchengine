@@ -6,10 +6,7 @@ import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import searchengine.config.JsoupConfig;
-import searchengine.model.DBIndex;
-import searchengine.model.DBLemma;
-import searchengine.model.DBPage;
-import searchengine.model.DBSite;
+import searchengine.model.*;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
@@ -38,21 +35,10 @@ public class SiteParseAction extends RecursiveAction {
         if (!IndexingServiceImpl.indexationIsRunning) Thread.currentThread().interrupt();
         try {
             Thread.sleep(config.getSleep());
-            Connection.Response response = Jsoup.connect(url)
-                    .userAgent(config.getUserAgent())
-                    .referrer(config.getReferrer())
-                    .timeout(config.getTimeout())
-                    .ignoreHttpErrors(true)
-                    .followRedirects(config.isRedirect())
-                    .execute();
+            Connection.Response response = Jsoup.connect(url).userAgent(config.getUserAgent()).referrer(config.getReferrer()).timeout(config.getTimeout()).ignoreHttpErrors(true).followRedirects(config.isRedirect()).execute();
             Document doc = response.parse();
             DBSite site = siteRepository.findById(siteId).get();
-            DBPage page = DBPage.builder()
-                    .path(url.replace(site.getUrl(), ""))
-                    .dbSite(site)
-                    .code(response.statusCode())
-                    .content(doc.outerHtml())
-                    .build();
+            DBPage page = DBPage.builder().path(url.replace(site.getUrl(), "")).dbSite(site).code(response.statusCode()).content(doc.outerHtml()).build();
             HtmlParse htmlParse = new HtmlParse(site, page, lemmaFinder, lemmaRepository);
             updateDataBase(url, site, page, htmlParse.getLemmas(), htmlParse.getIndexes());
             doc.select("body").select("a").forEach(link -> {
@@ -67,21 +53,19 @@ public class SiteParseAction extends RecursiveAction {
             });
             //TODO: как понять, что индексация завершена...
             //TODO: переделать "отлов" ошибок...
-
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        } catch (InterruptedException | IOException e) {
+            log.error(e.getMessage());
         }
     }
 
     private synchronized void updateDataBase(String url, DBSite site, DBPage page, List<DBLemma> lemmas, List<DBIndex> indexes) {
+        if (!IndexingServiceImpl.indexationIsRunning) return;
         processedLink.put(url, true);
         site.setStatusTime(new Date());
-        siteRepository.save(site);
-        pageRepository.save(page);
-        if (lemmas != null) lemmaRepository.saveAll(lemmas);
-        if (indexes != null) indexRepository.saveAll(indexes);
+        siteRepository.saveAndFlush(site);
+        pageRepository.saveAndFlush(page);
+        if (lemmas != null) lemmaRepository.saveAllAndFlush(lemmas);
+        if (indexes != null) indexRepository.saveAllAndFlush(indexes);
     }
 
     private boolean isCorrectLink(String url, String rootUrl) {

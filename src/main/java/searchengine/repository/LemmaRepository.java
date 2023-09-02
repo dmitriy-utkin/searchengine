@@ -15,5 +15,5 @@ public interface LemmaRepository extends JpaRepository<DBLemma, Integer> {
     void deleteByDbSite(DBSite dbSite);
     Optional<DBLemma> findByDbSiteAndLemma(DBSite dbSite, String lemma);
     Optional<List<DBLemma>> findByLemma(String lemma);
-    List<DBLemma> findByDbSite(DBSite dbSite);
+    List<DBLemma> findAllByDbSite(DBSite dbSite);
 }

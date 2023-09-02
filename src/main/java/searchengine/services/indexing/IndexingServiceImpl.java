@@ -2,6 +2,9 @@ package searchengine.services.indexing;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Connection;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -39,6 +42,9 @@ public class IndexingServiceImpl implements IndexingService {
 
     public static boolean indexationIsRunning = false;
 
+    //TODO: придумать механизм "завершения индексации", т.е. добавить обновление статуса -> Status.INDEXED
+    //TODO: поработать над механизмом выставления "ошибок", к примеру в случае, если главная страница недоступна
+
     @Override
     public ResponseEntity<ResponseService> startIndexing(){
         if (siteRepository.existsByStatus(Status.INDEXING)) {
@@ -49,15 +55,7 @@ public class IndexingServiceImpl implements IndexingService {
         sitesList.getSites().forEach(site -> siteRepository.save(createSiteEntry(site)));
         siteRepository.findAll().forEach(dbSite -> {
             new Thread(() -> new ForkJoinPool().invoke(
-                    new SiteParseAction(jsoupConfig,
-                            siteRepository,
-                            pageRepository,
-                            lemmaRepository,
-                            lemmaFinder,
-                            indexRepository,
-                            dbSite.getId(),
-                            dbSite.getUrl(),
-                            new ConcurrentHashMap<>())
+                    new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite.getId(), dbSite.getUrl(), new ConcurrentHashMap<>())
             )).start();
         });
         return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
@@ -66,64 +64,28 @@ public class IndexingServiceImpl implements IndexingService {
     @Override
     public ResponseEntity<ResponseService> stopIndexing() {
         if (!siteRepository.existsByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(STOP_INDEXING_ERROR), HttpStatus.BAD_REQUEST);
-        else {
-            try {
-                indexationIsRunning = false;
-                List<DBSite> sites = siteRepository.findByStatus(Status.INDEXING);
-                sites.forEach(site -> {
-                    site.setStatus(Status.FAILED);
-                    site.setLastError("Stopped by user");
-                    site.setStatusTime(new Date());
-                    siteRepository.save(site);
-                });
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
-        }
-    }
-
-    @Override
-    public ResponseEntity<ResponseService> indexPage(String url) {
-        String preparedUrl = url.toLowerCase().trim();
-        List<DBSite> siteList = siteRepository.findAll();
-        boolean pageIsLinkedToExistedSites = false;
-        DBPage dbPage = null;
-        DBSite dbSite = null;
-        //TODO: сделать проверку по siteList из конфигурационного сайта
-        for (DBSite site : siteList) {
-            if (preparedUrl.contains(site.getUrl())) {
-                pageIsLinkedToExistedSites = true;
-                //TODO: error with a duplicate value for pages (when i add the same page in the second time)
-                dbSite = site;
-                Optional<DBPage> page = pageRepository.findByPathAndDbSite(preparedUrl.replace(site.getUrl(), ""), site);
-                if (page.isPresent()) {
-                    log.info("Started for " + page.get().getPath());
-                    indexRepository.deleteByDbPage(page.get());
-                    log.info("Found page: " + page.get().getPath() + "; " + page.get().getId());
-                    //TODO: if i add https://1c.ru (without "/" at the end of the site url) it will be error due to the sites in db with "/" at the end
-                    //TODO: ошибка с удалением (foreign key ...indexe... ) связана с тем, что удаляются леммы по сайту. Пробую убрать удаление из леммы, так как иначе нелдьзя удалить лемму по сайту, если она уже была проиндексирована
-//                    lemmaRepository.deleteByDbSite(dbSite);
-                    pageRepository.deleteById(page.get().getId());
-                }
-//                dbPage = createPageEntry(site, preparedUrl);
-                break;
-            }
-        }
-        //TODO: добавить проверку на наличие сайта в конфигурационном файле
-        if (!pageIsLinkedToExistedSites) {
-            return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(INDEX_PAGE_ERROR), HttpStatus.BAD_REQUEST);
-        } else {
-            //TODO: do not changed INDEXES and LEMMAS tables if it is the second and more relaunch of the page from the table
-            pageRepository.save(dbPage);
-            //TODO: переделывать индексацию отдельной страницы
-//            createLemmaAndIndex(dbSite, dbPage);
+        try {
+            indexationIsRunning = false;
+            List<DBSite> sites = siteRepository.findByStatus(Status.INDEXING);
+            sites.forEach(site -> updateSiteStatus(site, Status.FAILED, "Индексация остановлена пользователем"));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
     }
 
-    //TODO: добавляются одинаковые леммы, выглядит неправильно (нужно поменять, чтобы увеличивалось кол-во лемм?)
-
+    @Override
+    public ResponseEntity<ResponseService> indexPage(String newUrl) {
+        String preparedUrl = newUrl.toLowerCase().trim();
+        if (sitesList.getSites().stream().map(Site::getUrl).noneMatch(preparedUrl::startsWith)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(INDEX_PAGE_ERROR), HttpStatus.BAD_REQUEST);
+        List<DBSite> sites = siteRepository.findAll().stream().filter(site -> preparedUrl.startsWith(site.getUrl())).toList();
+        updateSiteStatus(sites.get(0), Status.INDEXING);
+        clearDataBaseByOnePage(pageRepository.findByPathAndDbSite(preparedUrl.replace(sites.get(0).getUrl(), ""), sites.get(0)));
+        DBPage dbPage = pageRepository.save(createNewPageEntry(preparedUrl, sites.get(0)));
+        updateDataBaseForOneIndexedPage(sites.get(0), dbPage, new HtmlParse(sites.get(0), dbPage, lemmaFinder, lemmaRepository));
+        updateSiteStatus(sites.get(0), Status.INDEXED);
+        return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
+    }
 
     private DBSite createSiteEntry(Site site) {
         return DBSite.builder()
@@ -137,11 +99,71 @@ public class IndexingServiceImpl implements IndexingService {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
+    private void updateSiteStatus(DBSite site, Status newStatus) {
+        site.setStatus(newStatus);
+        site.setStatusTime(new Date());
+        siteRepository.saveAndFlush(site);
+        log.info("Site status for \"" + site.getUrl() + "\" was changed to \"" + newStatus.toString() + "\".");
+    }
+
+    private void updateSiteStatus(DBSite site, Status newStatus, String lastError) {
+        site.setStatus(newStatus);
+        site.setLastError(lastError);
+        site.setStatusTime(new Date());
+        siteRepository.saveAndFlush(site);
+        log.info("Site status for \"" + site.getUrl() + "\" was changed to \"" + newStatus.toString() + "\" with last error \"" + lastError + "\".");
+
+    }
+
     private void clearDataBase(boolean indexes, boolean lemmas, boolean pages, boolean sites) {
         if (indexes) {indexRepository.deleteAllInBatch(); log.info("Indexes was deleted.");}
         if (lemmas) {lemmaRepository.deleteAllInBatch(); log.info("Lemmas was deleted.");}
         if (pages) {pageRepository.deleteAllInBatch(); log.info("Pages was deleted.");}
         if (sites) {siteRepository.deleteAllInBatch(); log.info("Sites was deleted.");}
+    }
+
+    private DBPage createNewPageEntry(String uri, DBSite site) {
+        try {
+            Connection.Response response = Jsoup.connect(uri)
+                    .userAgent(jsoupConfig.getUserAgent())
+                    .referrer(jsoupConfig.getReferrer())
+                    .timeout(jsoupConfig.getTimeout())
+                    .ignoreHttpErrors(true)
+                    .followRedirects(jsoupConfig.isRedirect())
+                    .execute();
+            Document doc = response.parse();
+            return DBPage.builder()
+                    .path(uri.replace(site.getUrl(), ""))
+                    .dbSite(site)
+                    .code(response.statusCode())
+                    .content(doc.outerHtml())
+                    .build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return DBPage.builder()
+                    .path(uri.replace(site.getUrl(), ""))
+                    .dbSite(site)
+                    .code(404)
+                    .content("")
+                    .build();
+        }
+    }
+
+    private void clearDataBaseByOnePage(Optional<DBPage> optionalDBPage) {
+        if (optionalDBPage.isEmpty()) return;
+        List<DBLemma> lemmas = indexRepository.findByDbPage(optionalDBPage.get()).get().stream().map(dbIndex -> {DBLemma dbLemma = dbIndex.getDbLemma(); dbLemma.setFrequency(dbLemma.getFrequency() - 1); return dbLemma;}).toList();
+        lemmaRepository.saveAll(lemmas);
+        indexRepository.deleteByDbPage(optionalDBPage.get());
+        pageRepository.deleteById(optionalDBPage.get().getId());
+
+    }
+
+    private void updateDataBaseForOneIndexedPage(DBSite site, DBPage page, HtmlParse htmlParse) {
+        pageRepository.save(page);
+        if (htmlParse.getLemmas() != null) lemmaRepository.saveAll(htmlParse.getLemmas());
+        if (htmlParse.getIndexes() != null) indexRepository.saveAll(htmlParse.getIndexes());
+        site.setStatusTime(new Date());
+        siteRepository.save(site);
     }
 
 }

@@ -15,4 +15,5 @@ import java.util.Optional;
 public interface IndexRepository extends JpaRepository<DBIndex, Integer> {
     void deleteByDbPage(DBPage dbPage);
     Optional<List<DBIndex>> findByDbLemma(DBLemma dbLemma);
+    Optional<List<DBIndex>> findByDbPage(DBPage dbPage);
 }

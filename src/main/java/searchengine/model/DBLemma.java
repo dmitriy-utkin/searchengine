@@ -1,6 +1,7 @@
 package searchengine.model;
 
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.context.annotation.DependsOn;
 
 import javax.persistence.*;
@@ -17,6 +18,7 @@ import javax.transaction.Transactional;
 @Transactional
 @Table(name = "lemmas")
 @DependsOn("sites")
+@DynamicUpdate
 public class DBLemma {
 
     @Id

@@ -10,6 +10,7 @@ import searchengine.repository.LemmaRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class HtmlParse {
 
@@ -35,17 +36,19 @@ public class HtmlParse {
     private void collectLemmasAndIndexes(boolean isIncorrectCode) {
         if (isIncorrectCode) {lemmas = null; indexes = null; return;}
         Map<String, Integer> lemmasMap = lemmaFinder.collectLemmas(page.getContent());
-        List<String> dbLemmas = lemmaRepository.findByDbSite(site).stream().map(DBLemma::getLemma).toList();
+        Map<String, Integer> dbLemmas = lemmaRepository.findAllByDbSite(site)
+                .stream()
+                .collect(Collectors.toMap(DBLemma::getLemma, DBLemma::getFrequency));
         lemmasMap.keySet().forEach(lemma -> {
-            DBLemma dbLemma = dbLemmas.contains(lemma) ? updateLemmaFrequency(lemma) : createLemmaEntry(site, lemma);
+            DBLemma dbLemma = dbLemmas.containsKey(lemma) ? updateLemmaFrequency(lemma, dbLemmas) : createLemmaEntry(site, lemma);
             lemmas.add(dbLemma);
             indexes.add(createIndexEntry(page, dbLemma, lemmasMap.get(lemma)));
         });
     }
 
-    private DBLemma updateLemmaFrequency(String lemma) {
+    private DBLemma updateLemmaFrequency(String lemma, Map<String, Integer> dbLemmas) {
         DBLemma dbLemma = lemmaRepository.findByDbSiteAndLemma(site, lemma).get();
-        dbLemma.setFrequency(dbLemma.getFrequency() + 1);
+        dbLemma.setFrequency(dbLemmas.get(lemma) + 1);
         return dbLemma;
     }
 

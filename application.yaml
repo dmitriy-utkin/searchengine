@@ -28,8 +28,8 @@ indexing-settings:
 #      name: IP Fran
     - url: https://www.lutherancathedral.ru/
       name: Lutheran Cathedral
-#    - url: https://www.svetlovka.ru/
-#      name: Svetlovka
+    - url: https://www.svetlovka.ru/
+      name: Svetlovka
     - url: https://www.programmaster.ru
       name: Program Master
 #    - url: https://dombulgakova.ru/
