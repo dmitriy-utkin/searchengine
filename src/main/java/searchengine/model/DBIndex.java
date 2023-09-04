@@ -32,5 +32,5 @@ public class DBIndex {
     private DBLemma dbLemma;
 
     @Column(name = "lemma_rank", nullable = false)
-    private float rank;
+    private int rank;
 }

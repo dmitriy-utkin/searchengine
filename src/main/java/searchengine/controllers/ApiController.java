@@ -44,10 +44,7 @@ public class ApiController {
                                                   @RequestParam(required = false) DBSite dbSite,
                                                   @RequestParam(required = false) Integer offset,
                                                   @RequestParam(required = false) Integer limit) {
-        if (offset == null) offset = 0;
-        if (limit == null) limit = 20;
 
-        //TODO: проконтроллировать условие, что сайт идет без "/" в конце
         return searchService.search(query, dbSite, offset, limit);
     }
 }

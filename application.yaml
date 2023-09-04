@@ -15,23 +15,26 @@ spring:
       ddl-auto: update
     show-sql: true
 
-indexing-settings:
+search-settings:
+  maxFrequencyInPercent: 70
+  defaultOffset: 0
+  defaultLimit: 20
 
+indexing-settings:
   userAgent: DeepSearchBot
   referrer: http://www.google.com
   redirect: true
   sleep: 200
   timeout: 10000
-
   sites:
 #    - url: https://ipfran.ru/
 #      name: IP Fran
-    - url: https://www.lutherancathedral.ru/
-      name: Lutheran Cathedral
-    - url: https://www.svetlovka.ru/
-      name: Svetlovka
-    - url: https://www.programmaster.ru
-      name: Program Master
+#    - url: https://www.lutherancathedral.ru/
+#      name: Lutheran Cathedral
+#    - url: https://www.svetlovka.ru/
+#      name: Svetlovka
+#    - url: https://www.programmaster.ru
+#      name: Program Master
 #    - url: https://dombulgakova.ru/
 #      name: Дом Булгакова
     - url: https://ezo-restoran.ru

@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import searchengine.config.SearchConfig;
 import searchengine.dto.search.SearchDataItem;
 import searchengine.model.DBLemma;
 import searchengine.model.DBPage;
@@ -29,22 +30,24 @@ public class SearchServiceImpl implements SearchService {
     private final LemmaRepository lemmaRepository;
     private final IndexRepository indexRepository;
     private final LemmaFinder lemmaFinder;
+    private final SearchConfig searchConfig;
 
-    private static final int MAX_LEMMA_FREQUENCY = 60;
     private static final String EMPTY_QUERY_SEARCH_ERROR = "Задан пустой поисковый запрос";
 
 
     @Override
     public ResponseEntity<ResponseService> search(String query, DBSite dbSite, int offset, int limit) {
         if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(EMPTY_QUERY_SEARCH_ERROR), HttpStatus.BAD_REQUEST);
-
-        List<DBLemma> preparedQueryLemmas = convertAndSortQueryToLemmasList(query, lemmaFinder, lemmaRepository, pageRepository);
-        List<DBPage> preparedPages = collectSearchDataItems(preparedQueryLemmas, 0, new ArrayList<>(), indexRepository, pageRepository);
-        StringBuilder sb = new StringBuilder();
-        preparedPages.forEach(page -> {
-            sb.append("ID: ").append(page.getId()).append("; path: ").append(page.getPath()).append(";\n");
-        });
-        log.info(sb.toString());
+        if (offset == 0) offset = searchConfig.getDefaultOffset();
+        if (limit == 0) limit = searchConfig.getDefaultLimit();
+        Map<String, List<DBLemma>> preparedLemmas = getPreparedLemmas(query.toLowerCase().trim());
+        getSearchedPages(preparedLemmas);
+//        List<DBPage> preparedPages = collectSearchDataItems(preparedLemmas, 0, new ArrayList<>(), indexRepository, pageRepository);
+//        StringBuilder sb = new StringBuilder();
+//        preparedPages.forEach(page -> {
+//            sb.append("ID: ").append(page.getId()).append("; path: ").append(page.getPath()).append(";\n");
+//        });
+//        log.info(sb.toString());
 
 //        for (int i = 1; i <= 100; i++) {
 //            SearchDataItem item = SearchDataItem.builder()
@@ -63,42 +66,40 @@ public class SearchServiceImpl implements SearchService {
         return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
     }
 
-    private static List <DBLemma> convertAndSortQueryToLemmasList(String query,
-                                                                 LemmaFinder lemmaFinder,
-                                                                 LemmaRepository lemmaRepository,
-                                                                 PageRepository pageRepository) {
-        List<String> lemmas = lemmaFinder.collectLemmas(query.toLowerCase().trim()).keySet().stream().toList();
-        TreeMap<Integer, List<DBLemma>> lemmasMap = new TreeMap<>();
-        List<DBLemma> dbLemmasList = new ArrayList<>();
-        lemmas.forEach(lemma -> {
-            int totalFrequency = 0;
-            List<DBLemma> dbLemmas = lemmaRepository.findByLemma(lemma).isPresent() ? lemmaRepository.findByLemma(lemma).get() : null;
-            for (DBLemma dbLemma : dbLemmas) {
-                totalFrequency += dbLemma.getFrequency();
+    //TODO: проблема с хранением данных в Map (TreeMap dblemmas) -> не сохраняются леммы с такими же ключами (значение, к примеру freq=2 for A and B, B will replace A.
+    private Map<String, List<DBLemma>> getPreparedLemmas(String query) {
+        double totalNumberOfPages = (double) pageRepository.count();
+        Map<Integer, String> dbLemmas = new TreeMap<>();
+        Map<String, List<DBLemma>> result = new HashMap<>();
+        lemmaFinder.collectLemmas(query).keySet().stream().toList().forEach(lemma -> {
+            if (lemmaRepository.findByLemma(lemma).get().stream().mapToInt(DBLemma::getFrequency).sum() / totalNumberOfPages * 100 < searchConfig.getMaxFrequencyInPercent()) {
+                dbLemmas.put(lemmaRepository.findByLemma(lemma).get().stream().mapToInt(DBLemma::getFrequency).sum(), lemma);
             }
-            if ((totalFrequency / (double) pageRepository.findAll().size() * 100 < MAX_LEMMA_FREQUENCY) && totalFrequency > 0) lemmasMap.put(totalFrequency, dbLemmas);
         });
-        for (int key : lemmasMap.keySet()) {
-            dbLemmasList.addAll(lemmasMap.get(key));
-        }
-        return dbLemmasList;
+        dbLemmas.values().forEach(lemma -> result.put(lemma, lemmaRepository.findByLemma(lemma).get()));
+        return result;
     }
 
-    private static List<DBPage> collectSearchDataItems(List<DBLemma> lemmas,
-                                                       int lemmaIndex,
-                                                       List<DBPage> result,
-                                                       IndexRepository indexRepository,
-                                                       PageRepository pageRepository) {
-
-        if (lemmaIndex >= lemmas.size() - 1) return result;
-        List<DBPage> pages = new ArrayList<>();
-        indexRepository.findByDbLemma(lemmas.get(lemmaIndex)).get().forEach(index -> pages.add(index.getDbPage()));
-        if (result.size() == 0) result.addAll(pages);
-        else pages.forEach(page -> {
-            if (!result.contains(page)) result.remove(page);
+    private Map<DBPage, Map<String, Integer>> getSearchedPages(Map<String, List<DBLemma>> preparedLemmas) {
+        Map<DBPage, Map<Integer, String>> result = new HashMap<>();
+        preparedLemmas.values().forEach(dbLemma -> {
+            dbLemma.forEach(lemma -> {
+                indexRepository.findByDbLemma(lemma).get().stream().forEach(dbIndex -> {
+                    result.put(dbIndex.getDbPage(), Map.of((int)dbIndex.getRank(), dbIndex.getDbLemma().getLemma()));
+                });
+            });
         });
-        collectSearchDataItems(lemmas, lemmaIndex + 1, result, indexRepository, pageRepository);
-        return result;
+
+        StringBuilder sb = new StringBuilder();
+//        .append(key.getId()).append(" - ").append(key.getDbSite().getUrl()).append(key.getPath()).
+        result.keySet().forEach(key -> sb.append("Page: id ").append(key.getId()).append("; ").append(result.get(key)));
+        log.info(sb.toString());
+        return null;
+    }
+
+    private List<DBPage> collectSearchDataItems() {
+
+        return null;
     }
 
 

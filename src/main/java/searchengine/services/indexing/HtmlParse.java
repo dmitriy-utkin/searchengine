@@ -60,7 +60,7 @@ public class HtmlParse {
                 .build();
     }
 
-    private DBIndex createIndexEntry(DBPage page, DBLemma lemma, float rank) {
+    private DBIndex createIndexEntry(DBPage page, DBLemma lemma, int rank) {
         return DBIndex.builder()
                 .dbPage(page)
                 .dbLemma(lemma)
