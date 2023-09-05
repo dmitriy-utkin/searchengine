@@ -12,8 +12,6 @@ import java.util.Optional;
 @Repository
 @Transactional
 public interface PageRepository extends JpaRepository<DBPage, Integer> {
-    void deleteByDbSite(DBSite dbSite);
-    Optional<DBPage> findByPath(String path);
     List<DBPage> findByDbSite(DBSite dbSite);
     Optional<DBPage> findByPathAndDbSite(String path, DBSite dbSite);
 }

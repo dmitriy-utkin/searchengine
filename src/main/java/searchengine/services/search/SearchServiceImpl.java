@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import searchengine.config.SearchConfig;
 import searchengine.dto.search.SearchDataItem;
+import searchengine.model.DBIndex;
 import searchengine.model.DBLemma;
 import searchengine.model.DBPage;
 import searchengine.model.DBSite;
@@ -66,34 +67,36 @@ public class SearchServiceImpl implements SearchService {
         return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
     }
 
-    //TODO: проблема с хранением данных в Map (TreeMap dblemmas) -> не сохраняются леммы с такими же ключами (значение, к примеру freq=2 for A and B, B will replace A.
     private Map<String, List<DBLemma>> getPreparedLemmas(String query) {
-        double totalNumberOfPages = (double) pageRepository.count();
-        Map<Integer, String> dbLemmas = new TreeMap<>();
+        float totalNumberOfPages = (float) pageRepository.count();
+        Map<Float, String> dbLemmas = new TreeMap<>();
         Map<String, List<DBLemma>> result = new HashMap<>();
         lemmaFinder.collectLemmas(query).keySet().stream().toList().forEach(lemma -> {
-            if (lemmaRepository.findByLemma(lemma).get().stream().mapToInt(DBLemma::getFrequency).sum() / totalNumberOfPages * 100 < searchConfig.getMaxFrequencyInPercent()) {
-                dbLemmas.put(lemmaRepository.findByLemma(lemma).get().stream().mapToInt(DBLemma::getFrequency).sum(), lemma);
-            }
+            float totalFrequencyByLemma = lemmaRepository.sumFrequencyByLemma(lemma);
+            if (totalFrequencyByLemma / totalNumberOfPages * 100 < searchConfig.getMaxFrequencyInPercent()) dbLemmas.put(setLemmaSortedMapKey(dbLemmas, totalFrequencyByLemma), lemma);
         });
         dbLemmas.values().forEach(lemma -> result.put(lemma, lemmaRepository.findByLemma(lemma).get()));
         return result;
     }
 
+    //TODO: придумать, как поправить костыль. Необходим, чтобы в Map`у попадали Lemmas с одинаковыми значениями frequency
+    private float setLemmaSortedMapKey(Map<Float, String> dbLemmas, float totalFrequencyByLemma) {
+        while(true) {
+            if (!dbLemmas.containsKey(totalFrequencyByLemma)) return totalFrequencyByLemma;
+            else totalFrequencyByLemma += 0.1F;
+        }
+    }
+
     private Map<DBPage, Map<String, Integer>> getSearchedPages(Map<String, List<DBLemma>> preparedLemmas) {
         Map<DBPage, Map<Integer, String>> result = new HashMap<>();
-        preparedLemmas.values().forEach(dbLemma -> {
-            dbLemma.forEach(lemma -> {
-                indexRepository.findByDbLemma(lemma).get().stream().forEach(dbIndex -> {
-                    result.put(dbIndex.getDbPage(), Map.of((int)dbIndex.getRank(), dbIndex.getDbLemma().getLemma()));
-                });
-            });
-        });
-
-        StringBuilder sb = new StringBuilder();
-//        .append(key.getId()).append(" - ").append(key.getDbSite().getUrl()).append(key.getPath()).
-        result.keySet().forEach(key -> sb.append("Page: id ").append(key.getId()).append("; ").append(result.get(key)));
-        log.info(sb.toString());
+        Map<DBPage, String> preResult = new HashMap<>();
+        for (String lemma : preparedLemmas.keySet()) {
+            for (DBLemma dbLemma : preparedLemmas.get(lemma)) {
+                List<DBIndex> idexes = indexRepository.findByDbLemma(dbLemma).get();
+                idexes.forEach(index -> preResult.put(index.getDbPage(), lemma));
+            }
+        }
+        log.info(preResult.entrySet().toString());
         return null;
     }
 
