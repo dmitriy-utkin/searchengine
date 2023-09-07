@@ -18,6 +18,6 @@ public interface LemmaRepository extends JpaRepository<DBLemma, Integer> {
     Optional<List<DBLemma>> findByLemma(String lemma);
     List<DBLemma> findAllByDbSite(DBSite dbSite);
     @Query("SELECT SUM(l.frequency) FROM DBLemma l WHERE l.lemma = :lemma")
-    Integer sumFrequencyByLemma(@Param("lemma") String lemma);
+    Optional<Integer> sumFrequencyByLemma(@Param("lemma") String lemma);
 
 }

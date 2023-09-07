@@ -32,7 +32,7 @@ public enum ResponseServiceImpl {;
         @Value public static class SearchSuccessResponseService implements ResponseService, Result {
             public SearchSuccessResponseService(List<SearchDataItem> data) {
                 this.result = true;
-                this.count = data.size();
+                this.count = data == null ? 0 : data.size();
                 this.data = data;
             }
             Boolean result;
