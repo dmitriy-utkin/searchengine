@@ -19,6 +19,7 @@ search-settings:
   maxFrequencyInPercent: 70
   defaultOffset: 0
   defaultLimit: 20
+  snippetLength: 50
 
 indexing-settings:
   userAgent: DeepSearchBot

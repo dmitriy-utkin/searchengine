@@ -13,4 +13,5 @@ public class SearchConfig {
     private int maxFrequencyInPercent;
     private int defaultOffset;
     private int defaultLimit;
+    private int snippetLength;
 }

@@ -55,7 +55,7 @@ public class IndexingServiceImpl implements IndexingService {
         sitesList.getSites().forEach(site -> siteRepository.save(createSiteEntry(site)));
         siteRepository.findAll().forEach(dbSite -> {
             new Thread(() -> new ForkJoinPool().invoke(
-                    new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite.getId(), dbSite.getUrl(), new ConcurrentHashMap<>())
+                    new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite.getId(), dbSite.getUrl() + "/", new ConcurrentHashMap<>())
             )).start();
         });
         return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
@@ -74,6 +74,7 @@ public class IndexingServiceImpl implements IndexingService {
         return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
     }
 
+    //TODO: запуск в отдельном потоке как вариант
     @Override
     public ResponseEntity<ResponseService> indexPage(String newUrl) {
         String preparedUrl = newUrl.toLowerCase().trim();
