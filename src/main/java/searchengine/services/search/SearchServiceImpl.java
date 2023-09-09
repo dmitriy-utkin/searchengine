@@ -2,14 +2,13 @@ package searchengine.services.search;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.lucene.search.MultiCollectorManager;
 import org.jsoup.Jsoup;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import searchengine.config.SearchConfig;
 import searchengine.dto.search.SearchDataItem;
-import searchengine.model.DBIndex;
-import searchengine.model.DBLemma;
 import searchengine.model.DBPage;
 import searchengine.model.DBSite;
 import searchengine.repository.IndexRepository;
@@ -21,8 +20,6 @@ import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -45,77 +42,71 @@ public class SearchServiceImpl implements SearchService {
         if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(EMPTY_QUERY_SEARCH_ERROR), HttpStatus.BAD_REQUEST);
         if (offset == 0) offset = searchConfig.getDefaultOffset();
         if (limit == 0) limit = searchConfig.getDefaultLimit();
-        Map<String, List<DBLemma>> preparedLemmas = getPreparedLemmas(query.toLowerCase().trim());
-
-        List<SearchDataItem> items = collectSearchDataItems(getSearchedPages(preparedLemmas), List.of(query.split(" ")));
-
+        List<SearchDataItem> items = collectSearchDataItems(query);
         return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
-    }
-
-    private Map<DBPage, Integer> getSearchedPages(Map<String, List<DBLemma>> preparedLemmas) {
-        return sortPageByExisted(collectPagesByIndexes(collectIndexesByLemmas(preparedLemmas)));
     }
 
     //TODO: поправить костыль с сортировкой (добавлется порядковый номер!!!!!)
     //TODO: возвращается значение без сортировки в дальнейшие методы!
-    private Map<String, List<DBLemma>> getPreparedLemmas(String query) {
+    private  Map<DBPage, Integer> preparePageList(String query) {
         float totalNumberOfPages = (float) pageRepository.count();
-        Map<Float, String> dbLemmas = new TreeMap<>();
-        Map<String, List<DBLemma>> result = new LinkedHashMap<>();
-        lemmaFinder.collectLemmas(query).keySet().stream().toList().forEach(lemma -> {
+        List<SearchEngineObject> result = new ArrayList<>();
+        lemmaFinder.collectLemmas(query).keySet().forEach(lemma -> {
             Optional<Integer> totalFrequencyByLemma = lemmaRepository.sumFrequencyByLemma(lemma);
-            if (totalFrequencyByLemma.isPresent() && (float) totalFrequencyByLemma.get() / totalNumberOfPages * 100 < searchConfig.getMaxFrequencyInPercent()) dbLemmas.put(setSortedMapKey(dbLemmas.keySet(), (float) totalFrequencyByLemma.get()), lemma);
+            if (totalFrequencyByLemma.isPresent() && (float) totalFrequencyByLemma.get() / totalNumberOfPages * 100 < searchConfig.getMaxFrequencyInPercent()) result.add(SearchEngineObject.builder().lemma(lemma).totalFrequency(totalFrequencyByLemma.get()).dbLemmaList(lemmaRepository.findByLemma(lemma).get()).build());
         });
-        dbLemmas.values().forEach(lemma -> {
-            result.put(lemma, lemmaRepository.findByLemma(lemma).get());
-        });
-        return result;
+        if (result.isEmpty() || result == null) return null;
+        result.forEach(this::collectIndexes);
+        result.forEach(this::collectSearchEnginePages);
+        return filterPagesByExisted(result);
     }
 
     //TODO: переписать таким образом, чтобы из основного метода был только один вызодв, внутри которого будет вызов остальных методов
 
-    private Map<String, List<DBIndex>> collectIndexesByLemmas(Map<String, List<DBLemma>> lemmaDbLemmaMap) {
-        return lemmaDbLemmaMap.keySet().stream().collect(Collectors.toMap(Function.identity(), lemma -> indexRepository.findByDbLemmaIn(lemmaDbLemmaMap.get(lemma))));
+
+    private void collectIndexes(SearchEngineObject searchEngineObject) {
+        searchEngineObject.setDbIndexList(indexRepository.findByDbLemmaIn(searchEngineObject.getDbLemmaList()));
     }
 
-    private Map<String, Map<DBPage, Integer>> collectPagesByIndexes(Map<String, List<DBIndex>> lemmaDbIndexMap) {
-        return lemmaDbIndexMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().stream().collect(Collectors.toMap(DBIndex::getDbPage, DBIndex::getRank))));
+    private void collectSearchEnginePages(SearchEngineObject searchEngineObject) {
+        List<SearchEnginePage> pages = new ArrayList<>();
+        searchEngineObject.getDbIndexList().forEach(index -> pages.add(SearchEnginePage.builder().dbPage(index.getDbPage()).rank(index.getRank()).build()));
+        searchEngineObject.setSearchEnginePageList(pages);
     }
 
-    //TODO: добавить сортировку страниц по значению Integer (lemma_rank)
-    private Map<DBPage, Integer> sortPageByExisted(Map<String, Map<DBPage, Integer>> lemmaDbPageMap) {
-        AtomicBoolean isStart = new AtomicBoolean(true);
-        Map<DBPage, Integer> result = new HashMap<>();
-        if (lemmaDbPageMap.size() == 1) return lemmaDbPageMap.values().iterator().next();
-        if (lemmaDbPageMap.isEmpty()) return null;
-        lemmaDbPageMap.keySet().forEach(lemma -> {
-            Map<DBPage, Integer> semiFinishedList = lemmaDbPageMap.get(lemma);
-            if (isStart.get()) {result.putAll(semiFinishedList); isStart.set(false);}
-            else {
-                Map<DBPage, Integer> semiFinishedResult = new HashMap<>();
-                semiFinishedList.keySet().forEach(page -> {
-                    if (result.containsKey(page)) semiFinishedResult.put(page, result.get(page) + semiFinishedList.get(page));
-                });
-                result.clear();
-                result.putAll(semiFinishedResult);
-            }
+    private Map<DBPage, Integer> filterPagesByExisted(List<SearchEngineObject> list) {
+        if (list.isEmpty()) return null;
+        Collections.sort(list);
+        Map<DBPage, Integer> dbPageRankMap = list.get(0).getSearchEnginePageList().stream().collect(Collectors.toMap(SearchEnginePage::getDbPage, SearchEnginePage::getRank));
+        list.remove(0);
+        list.forEach(searchEngineObject -> {
+            Map<DBPage, Integer> semiResult = new HashMap<>();
+            searchEngineObject.getSearchEnginePageList().forEach(searchEnginePage -> {
+                if (dbPageRankMap.containsKey(searchEnginePage.getDbPage())) {
+                    semiResult.put(searchEnginePage.getDbPage(), dbPageRankMap.get(searchEnginePage.getDbPage()) + searchEnginePage.getRank());
+                }
+            });
+            dbPageRankMap.clear();
+            dbPageRankMap.putAll(semiResult);
         });
-
-        return result;
+        return dbPageRankMap.isEmpty() ? null : dbPageRankMap;
     }
 
-    private List<SearchDataItem> collectSearchDataItems(Map<DBPage, Integer> pages, List<String> searchWords) {
-        if (pages == null) return null;
+    private List<SearchDataItem> collectSearchDataItems(String query) {
+        Map<DBPage, Integer> pages = preparePageList(query);
         List<SearchDataItem> result = new ArrayList<>();
+//        Collections.sort(pages);
+        if (pages == null) return null;
         pages.keySet().forEach(page -> result.add(SearchDataItem.builder()
                         .relevance(pages.get(page))
                         .title(getTitle(page.getContent()))
-                        .snippet(createSnippet(page.getContent(), searchWords))
+                        .snippet(createSnippet(page.getContent(), List.of(query.toLowerCase().trim().split(" "))))
                         .uri(page.getPath())
                         .site(page.getDbSite().getUrl())
                         .siteName(page.getDbSite().getName())
                         .build()));
         return result;
+//        return null;
     }
 
     //TODO: вылетает за пределы текста, сделать проверку

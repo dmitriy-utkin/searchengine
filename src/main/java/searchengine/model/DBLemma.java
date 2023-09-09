@@ -14,7 +14,7 @@ import javax.transaction.Transactional;
 @EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"dbSite", "frequency"})
+@ToString(exclude = {"dbSite"})
 @Transactional
 @Table(name = "lemmas")
 @DependsOn("sites")

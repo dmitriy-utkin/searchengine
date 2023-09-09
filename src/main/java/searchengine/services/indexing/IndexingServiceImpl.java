@@ -74,17 +74,18 @@ public class IndexingServiceImpl implements IndexingService {
         return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
     }
 
-    //TODO: запуск в отдельном потоке как вариант
     @Override
     public ResponseEntity<ResponseService> indexPage(String newUrl) {
         String preparedUrl = newUrl.toLowerCase().trim();
         if (sitesList.getSites().stream().map(Site::getUrl).noneMatch(preparedUrl::startsWith)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(INDEX_PAGE_ERROR), HttpStatus.BAD_REQUEST);
-        List<DBSite> sites = siteRepository.findAll().stream().filter(site -> preparedUrl.startsWith(site.getUrl())).toList();
-        updateSiteStatus(sites.get(0), Status.INDEXING);
-        clearDataBaseByOnePage(pageRepository.findByPathAndDbSite(preparedUrl.replace(sites.get(0).getUrl(), ""), sites.get(0)));
-        DBPage dbPage = pageRepository.save(createNewPageEntry(preparedUrl, sites.get(0)));
-        updateDataBaseForOneIndexedPage(sites.get(0), dbPage, new HtmlParse(sites.get(0), dbPage, lemmaFinder, lemmaRepository));
-        updateSiteStatus(sites.get(0), Status.INDEXED);
+        new Thread(() -> {
+            List<DBSite> sites = siteRepository.findAll().stream().filter(site -> preparedUrl.startsWith(site.getUrl())).toList();
+            updateSiteStatus(sites.get(0), Status.INDEXING);
+            clearDataBaseByOnePage(pageRepository.findByPathAndDbSite(preparedUrl.replace(sites.get(0).getUrl(), ""), sites.get(0)));
+            DBPage dbPage = pageRepository.save(createNewPageEntry(preparedUrl, sites.get(0)));
+            updateDataBaseForOneIndexedPage(sites.get(0), dbPage, new HtmlParse(sites.get(0), dbPage, lemmaFinder, lemmaRepository));
+            updateSiteStatus(sites.get(0), Status.INDEXED);
+        }).start();
         return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
     }
 
