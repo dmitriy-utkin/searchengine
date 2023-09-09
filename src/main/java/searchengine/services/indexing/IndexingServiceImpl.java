@@ -42,7 +42,6 @@ public class IndexingServiceImpl implements IndexingService {
 
     public static boolean indexationIsRunning = false;
 
-    //TODO: придумать механизм "завершения индексации", т.е. добавить обновление статуса -> Status.INDEXED
     //TODO: поработать над механизмом выставления "ошибок", к примеру в случае, если главная страница недоступна
 
     @Override
@@ -54,9 +53,10 @@ public class IndexingServiceImpl implements IndexingService {
         clearDataBase(true, true, true, true);
         sitesList.getSites().forEach(site -> siteRepository.save(createSiteEntry(site)));
         siteRepository.findAll().forEach(dbSite -> {
-            new Thread(() -> new ForkJoinPool().invoke(
-                    new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite.getId(), dbSite.getUrl() + "/", new ConcurrentHashMap<>())
-            )).start();
+            new Thread(() -> {
+                new ForkJoinPool().invoke(new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite.getId(), dbSite.getUrl() + "/", new ConcurrentHashMap<>()));
+                updateSiteStatus(dbSite, Status.INDEXED);
+            }).start();
         });
         return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
     }
@@ -102,10 +102,11 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     private void updateSiteStatus(DBSite site, Status newStatus) {
+        if (newStatus.equals(Status.INDEXED) && !indexationIsRunning) return;
         site.setStatus(newStatus);
         site.setStatusTime(new Date());
         siteRepository.saveAndFlush(site);
-        log.info("Site status for \"" + site.getUrl() + "\" was changed to \"" + newStatus.toString() + "\".");
+        log.info("Site status for \"" + site.getUrl() + "\" was changed to \"" + newStatus + "\".");
     }
 
     private void updateSiteStatus(DBSite site, Status newStatus, String lastError) {
@@ -114,6 +115,7 @@ public class IndexingServiceImpl implements IndexingService {
         site.setStatusTime(new Date());
         siteRepository.saveAndFlush(site);
         log.info("Site status for \"" + site.getUrl() + "\" was changed to \"" + newStatus.toString() + "\" with last error \"" + lastError + "\".");
+        if (siteRepository.existsByStatus(Status.INDEXING)) indexationIsRunning = false;
 
     }
 

@@ -19,6 +19,7 @@ import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
 
 import java.util.*;
+import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -79,26 +80,28 @@ public class SearchServiceImpl implements SearchService {
         list.get(0).getSearchEnginePageList().forEach(searchEnginePage -> finalPageList.add(SearchEngineFinalPage.builder().dbPage(searchEnginePage.getDbPage()).absRel(searchEnginePage.getRank()).build()));
         List<DBPage> dbPagesToCheck = new ArrayList<>(finalPageList.stream().map(SearchEngineFinalPage::getDbPage).toList());
 //        list.remove(0);
-        int maxAbsRel = 1;
+        //TODO: переписать метод, чтобы не использовать список DBPage, заменить на простой стрим со сбором страниц из finalEnginePage
+        //TODO: проверить, как должен отрабатывать метод, если лист пустой. Может, изменить выдачу на "false"?
+
         for (SearchEngineObject searchEngineObject : list) {
             List<SearchEngineFinalPage> semiFinalPageList = new ArrayList<>();
             List<DBPage> semiDbPagesToCheck = new ArrayList<>();
             for (SearchEnginePage searchEnginePage : searchEngineObject.getSearchEnginePageList()) {
                 if (dbPagesToCheck.contains(searchEnginePage.getDbPage())) {
-                    maxAbsRel = Math.max(maxAbsRel, searchEnginePage.getRank());
                     semiFinalPageList.add(SearchEngineFinalPage.builder().dbPage(searchEnginePage.getDbPage()).absRel(searchEnginePage.getRank()).build());
                     semiDbPagesToCheck.add(searchEnginePage.getDbPage());
                 }
             }
+            //TODO: заменить метод установки maxAbsRel -> чтобы просто stream вычленл максимум по списку оставшихся страниц
             finalPageList.clear();
             finalPageList.addAll(semiFinalPageList);
             dbPagesToCheck.clear();
             dbPagesToCheck.addAll(semiDbPagesToCheck);
         }
         if (finalPageList.isEmpty()) return null;
-        int finalMaxAbsRel = maxAbsRel;
+        int maxAbsRel = finalPageList.stream().map(SearchEngineFinalPage::getAbsRel).max(Comparator.comparingInt(Integer::intValue)).orElse(1);
         //TODO: неправильно заполняется "максимальная релевантность ABS, поправить
-        finalPageList.forEach(finalPage -> finalPage.setRelRel((double) finalPage.getAbsRel() / finalMaxAbsRel));
+        finalPageList.forEach(finalPage -> finalPage.setRelRel((double) finalPage.getAbsRel() / maxAbsRel));
         return finalPageList;
     }
 
