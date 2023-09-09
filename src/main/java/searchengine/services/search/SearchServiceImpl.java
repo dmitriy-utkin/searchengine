@@ -2,7 +2,6 @@ package searchengine.services.search;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.lucene.search.MultiCollectorManager;
 import org.jsoup.Jsoup;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +19,6 @@ import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -48,7 +46,7 @@ public class SearchServiceImpl implements SearchService {
 
     //TODO: поправить костыль с сортировкой (добавлется порядковый номер!!!!!)
     //TODO: возвращается значение без сортировки в дальнейшие методы!
-    private  Map<DBPage, Integer> preparePageList(String query) {
+    private  List<SearchEngineFinalPage> preparePageList(String query) {
         float totalNumberOfPages = (float) pageRepository.count();
         List<SearchEngineObject> result = new ArrayList<>();
         lemmaFinder.collectLemmas(query).keySet().forEach(lemma -> {
@@ -74,36 +72,50 @@ public class SearchServiceImpl implements SearchService {
         searchEngineObject.setSearchEnginePageList(pages);
     }
 
-    private Map<DBPage, Integer> filterPagesByExisted(List<SearchEngineObject> list) {
+    private List<SearchEngineFinalPage> filterPagesByExisted(List<SearchEngineObject> list) {
         if (list.isEmpty()) return null;
         Collections.sort(list);
-        Map<DBPage, Integer> dbPageRankMap = list.get(0).getSearchEnginePageList().stream().collect(Collectors.toMap(SearchEnginePage::getDbPage, SearchEnginePage::getRank));
-        list.remove(0);
-        list.forEach(searchEngineObject -> {
-            Map<DBPage, Integer> semiResult = new HashMap<>();
-            searchEngineObject.getSearchEnginePageList().forEach(searchEnginePage -> {
-                if (dbPageRankMap.containsKey(searchEnginePage.getDbPage())) {
-                    semiResult.put(searchEnginePage.getDbPage(), dbPageRankMap.get(searchEnginePage.getDbPage()) + searchEnginePage.getRank());
+        List<SearchEngineFinalPage> finalPageList = new ArrayList<>();
+        list.get(0).getSearchEnginePageList().forEach(searchEnginePage -> finalPageList.add(SearchEngineFinalPage.builder().dbPage(searchEnginePage.getDbPage()).absRel(searchEnginePage.getRank()).build()));
+        List<DBPage> dbPagesToCheck = new ArrayList<>(finalPageList.stream().map(SearchEngineFinalPage::getDbPage).toList());
+//        list.remove(0);
+        int maxAbsRel = 1;
+        for (SearchEngineObject searchEngineObject : list) {
+            List<SearchEngineFinalPage> semiFinalPageList = new ArrayList<>();
+            List<DBPage> semiDbPagesToCheck = new ArrayList<>();
+            for (SearchEnginePage searchEnginePage : searchEngineObject.getSearchEnginePageList()) {
+                if (dbPagesToCheck.contains(searchEnginePage.getDbPage())) {
+                    maxAbsRel = Math.max(maxAbsRel, searchEnginePage.getRank());
+                    semiFinalPageList.add(SearchEngineFinalPage.builder().dbPage(searchEnginePage.getDbPage()).absRel(searchEnginePage.getRank()).build());
+                    semiDbPagesToCheck.add(searchEnginePage.getDbPage());
                 }
-            });
-            dbPageRankMap.clear();
-            dbPageRankMap.putAll(semiResult);
-        });
-        return dbPageRankMap.isEmpty() ? null : dbPageRankMap;
+            }
+            finalPageList.clear();
+            finalPageList.addAll(semiFinalPageList);
+            dbPagesToCheck.clear();
+            dbPagesToCheck.addAll(semiDbPagesToCheck);
+        }
+        if (finalPageList.isEmpty()) return null;
+        int finalMaxAbsRel = maxAbsRel;
+        //TODO: неправильно заполняется "максимальная релевантность ABS, поправить
+        finalPageList.forEach(finalPage -> finalPage.setRelRel((double) finalPage.getAbsRel() / finalMaxAbsRel));
+        return finalPageList;
     }
 
+    //TODO: затестить поиск на большом резульатею к примеру на "вебинары" выдает релевантность, равную > 1
     private List<SearchDataItem> collectSearchDataItems(String query) {
-        Map<DBPage, Integer> pages = preparePageList(query);
+        List<SearchEngineFinalPage> pages = preparePageList(query);
         List<SearchDataItem> result = new ArrayList<>();
 //        Collections.sort(pages);
         if (pages == null) return null;
-        pages.keySet().forEach(page -> result.add(SearchDataItem.builder()
-                        .relevance(pages.get(page))
-                        .title(getTitle(page.getContent()))
-                        .snippet(createSnippet(page.getContent(), List.of(query.toLowerCase().trim().split(" "))))
-                        .uri(page.getPath())
-                        .site(page.getDbSite().getUrl())
-                        .siteName(page.getDbSite().getName())
+        Collections.sort(pages);
+        pages.forEach(page -> result.add(SearchDataItem.builder()
+                        .relevance(page.getRelRel())
+                        .title(getTitle(page.getDbPage().getContent()))
+                        .snippet(createSnippet(page.getDbPage().getContent(), List.of(query.toLowerCase().trim().split(" "))))
+                        .uri(page.getDbPage().getPath())
+                        .site(page.getDbPage().getDbSite().getUrl())
+                        .siteName(page.getDbPage().getDbSite().getName())
                         .build()));
         return result;
 //        return null;
