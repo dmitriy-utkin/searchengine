@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class HtmlParse {
+public class HtmlParser {
 
     private final DBSite site;
     private final DBPage page;
@@ -23,7 +23,7 @@ public class HtmlParse {
     @Getter
     private List<DBIndex> indexes;
 
-    public HtmlParse(DBSite site, DBPage page, LemmaFinder lemmaFinder, LemmaRepository lemmaRepository) {
+    public HtmlParser(DBSite site, DBPage page, LemmaFinder lemmaFinder, LemmaRepository lemmaRepository) {
         this.site = site;
         this.page = page;
         this.lemmaFinder = lemmaFinder;

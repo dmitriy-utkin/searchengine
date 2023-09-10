@@ -6,6 +6,5 @@ import searchengine.services.response.ResponseService;
 
 @Service
 public interface StatisticsService {
-
     ResponseEntity<ResponseService> getStatistics();
 }

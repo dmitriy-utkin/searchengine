@@ -41,11 +41,11 @@ public class ApiController {
 
     @GetMapping("/search")
     public ResponseEntity<ResponseService> search(@RequestParam String query,
-                                                  @RequestParam(required = false) DBSite dbSite,
-                                                  @RequestParam(required = false) Integer offset,
-                                                  @RequestParam(required = false) Integer limit) {
+                                                  @RequestParam(required = false) String site,
+                                                  @RequestParam Integer offset,
+                                                  @RequestParam Integer limit) {
 
-        return searchService.search(query, dbSite, offset, limit);
+        return searchService.search(query, site, offset, limit);
     }
 }
 

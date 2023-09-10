@@ -6,10 +6,13 @@ import org.jsoup.Jsoup;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import searchengine.config.ErrorOptionConfig;
 import searchengine.config.SearchConfig;
 import searchengine.dto.search.SearchDataItem;
+import searchengine.dto.search.SearchEngineFinalPage;
+import searchengine.dto.search.SearchEngineObject;
+import searchengine.dto.search.SearchEnginePage;
 import searchengine.model.DBPage;
-import searchengine.model.DBSite;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
@@ -19,7 +22,6 @@ import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
 
 import java.util.*;
-import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -32,36 +34,37 @@ public class SearchServiceImpl implements SearchService {
     private final IndexRepository indexRepository;
     private final LemmaFinder lemmaFinder;
     private final SearchConfig searchConfig;
-
-    private static final String EMPTY_QUERY_SEARCH_ERROR = "Задан пустой поисковый запрос";
-
+    private final ErrorOptionConfig errorOptionConfig;
 
     @Override
-    public ResponseEntity<ResponseService> search(String query, DBSite dbSite, int offset, int limit) {
-        if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(EMPTY_QUERY_SEARCH_ERROR), HttpStatus.BAD_REQUEST);
+    public ResponseEntity<ResponseService> search(String query, String site, int offset, int limit) {
+        if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getEmptyQuerySearchError()), HttpStatus.BAD_REQUEST);
         if (offset == 0) offset = searchConfig.getDefaultOffset();
         if (limit == 0) limit = searchConfig.getDefaultLimit();
-        List<SearchDataItem> items = collectSearchDataItems(query);
+        List<SearchDataItem> items = collectSearchDataItems(query, site);
         return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
     }
 
-    //TODO: поправить костыль с сортировкой (добавлется порядковый номер!!!!!)
-    //TODO: возвращается значение без сортировки в дальнейшие методы!
-    private  List<SearchEngineFinalPage> preparePageList(String query) {
+    private  List<SearchEngineFinalPage> preparePageList(Set<String> searchWords, String siteUrl) {
         float totalNumberOfPages = (float) pageRepository.count();
         List<SearchEngineObject> result = new ArrayList<>();
-        lemmaFinder.collectLemmas(query).keySet().forEach(lemma -> {
-            Optional<Integer> totalFrequencyByLemma = lemmaRepository.sumFrequencyByLemma(lemma);
-            if (totalFrequencyByLemma.isPresent() && (float) totalFrequencyByLemma.get() / totalNumberOfPages * 100 < searchConfig.getMaxFrequencyInPercent()) result.add(SearchEngineObject.builder().lemma(lemma).totalFrequency(totalFrequencyByLemma.get()).dbLemmaList(lemmaRepository.findByLemma(lemma).get()).build());
-        });
-        if (result.isEmpty() || result == null) return null;
+        searchWords.forEach(lemma -> {
+                Optional<Integer> totalFrequencyByLemma = lemmaRepository.sumFrequencyByLemma(lemma);
+                float percent = (float) totalFrequencyByLemma.get() / totalNumberOfPages * 100;
+                if (totalFrequencyByLemma.isPresent() && (float) totalFrequencyByLemma.get() / totalNumberOfPages * 100 < searchConfig.getMaxFrequencyInPercent()) {
+                    result.add(SearchEngineObject.builder()
+                            .lemma(lemma)
+                            .totalFrequency(totalFrequencyByLemma.get())
+                            //TODO: если передавать сайт и по нему не будет найдено 0 лемм, ошибка - no value present
+                            .dbLemmaList(siteRepository.findByUrl(siteUrl).isPresent() ? List.of(lemmaRepository.findByDbSiteAndLemma(siteRepository.findByUrl(siteUrl).get(), lemma).get()) : lemmaRepository.findByLemma(lemma).get())
+                            .build());
+                }
+            });
+//        if (result.isEmpty() || result == null) return null;
         result.forEach(this::collectIndexes);
         result.forEach(this::collectSearchEnginePages);
         return filterPagesByExisted(result);
     }
-
-    //TODO: переписать таким образом, чтобы из основного метода был только один вызодв, внутри которого будет вызов остальных методов
-
 
     private void collectIndexes(SearchEngineObject searchEngineObject) {
         searchEngineObject.setDbIndexList(indexRepository.findByDbLemmaIn(searchEngineObject.getDbLemmaList()));
@@ -106,35 +109,34 @@ public class SearchServiceImpl implements SearchService {
     }
 
     //TODO: затестить поиск на большом резульатею к примеру на "вебинары" выдает релевантность, равную > 1
-    private List<SearchDataItem> collectSearchDataItems(String query) {
-        List<SearchEngineFinalPage> pages = preparePageList(query);
-        List<SearchDataItem> result = new ArrayList<>();
-//        Collections.sort(pages);
+    private List<SearchDataItem> collectSearchDataItems(String query, String site) {
+        Set<String> searchWords = lemmaFinder.collectLemmas(query).keySet();
+        List<SearchEngineFinalPage> pages = preparePageList(searchWords, site);
         if (pages == null) return null;
+        List<SearchDataItem> result = new ArrayList<>();
         Collections.sort(pages);
         pages.forEach(page -> result.add(SearchDataItem.builder()
                         .relevance(page.getRelRel())
                         .title(getTitle(page.getDbPage().getContent()))
-                        .snippet(createSnippet(page.getDbPage().getContent(), List.of(query.toLowerCase().trim().split(" "))))
+                        .snippet(createSnippet(page.getDbPage().getContent(), searchWords))
                         .uri(page.getDbPage().getPath())
                         .site(page.getDbPage().getDbSite().getUrl())
                         .siteName(page.getDbPage().getDbSite().getName())
                         .build()));
         return result;
-//        return null;
     }
 
     //TODO: вылетает за пределы текста, сделать проверку
-    private String createSnippet(String content, List<String> searchWords) {
+    private String createSnippet(String content, Set<String> searchWords) {
         try {
+            String text = Jsoup.parse(content).text();
             int mid;
             int endSearchedWord;
             int start;
             int end;
-            StringBuilder snippet = new StringBuilder();
+            StringBuilder snippet = new StringBuilder("<p>");
             int count = 0;
             for (String word : searchWords) {
-                String text = Jsoup.parse(content).text();
                 mid = text.toLowerCase().indexOf(word);
                 start = text.indexOf(" ",mid - searchConfig.getSnippetLength()) + 1;
                 end = text.indexOf(" ", mid + searchConfig.getSnippetLength());
@@ -142,6 +144,7 @@ public class SearchServiceImpl implements SearchService {
                 snippet.append(count > 0 ? "" : "...").append(text, start, mid).append("<b>").append(text, mid, endSearchedWord).append("</b>").append(text, endSearchedWord, end).append("...");
                 count++;
             }
+            snippet.append("</p>");
             return snippet.toString();
         } catch (Exception e) {
             e.printStackTrace();

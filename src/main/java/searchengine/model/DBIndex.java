@@ -27,7 +27,7 @@ public class DBIndex {
     @JoinColumn(name = "page_id", nullable = false)
     private DBPage dbPage;
 
-    @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.LAZY)
+    @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.EAGER)
     @JoinColumn(name = "lemma_id", nullable = false)
     private DBLemma dbLemma;
 

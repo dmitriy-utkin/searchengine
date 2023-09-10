@@ -39,7 +39,7 @@ public class SiteParseAction extends RecursiveAction {
             Document doc = response.parse();
             DBSite site = siteRepository.findById(siteId).get();
             DBPage page = DBPage.builder().path(url.replace(site.getUrl(), "")).dbSite(site).code(response.statusCode()).content(doc.outerHtml()).build();
-            HtmlParse htmlParse = new HtmlParse(site, page, lemmaFinder, lemmaRepository);
+            HtmlParser htmlParse = new HtmlParser(site, page, lemmaFinder, lemmaRepository);
             updateDataBase(url, site, page, htmlParse.getLemmas(), htmlParse.getIndexes());
             doc.select("body").select("a").forEach(link -> {
                 String uri = link.absUrl("href");
