@@ -9,10 +9,10 @@ import org.springframework.stereotype.Service;
 import searchengine.config.ErrorOptionConfig;
 import searchengine.config.SearchConfig;
 import searchengine.dto.search.SearchDataItem;
-import searchengine.dto.search.SearchEngineFinalPage;
-import searchengine.dto.search.SearchEngineObject;
-import searchengine.dto.search.SearchEnginePage;
-import searchengine.model.DBPage;
+import searchengine.dto.search.SearchQueryResult;
+import searchengine.dto.search.SearchQueryObject;
+import searchengine.dto.search.SearchQueryPage;
+import searchengine.model.DBSite;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
@@ -22,6 +22,7 @@ import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -45,111 +46,141 @@ public class SearchServiceImpl implements SearchService {
         return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
     }
 
-    private  List<SearchEngineFinalPage> preparePageList(Set<String> searchWords, String siteUrl) {
-        float totalNumberOfPages = (float) pageRepository.count();
-        List<SearchEngineObject> result = new ArrayList<>();
-        searchWords.forEach(lemma -> {
-                Optional<Integer> totalFrequencyByLemma = lemmaRepository.sumFrequencyByLemma(lemma);
-                float percent = (float) totalFrequencyByLemma.get() / totalNumberOfPages * 100;
-                if (totalFrequencyByLemma.isPresent() && (float) totalFrequencyByLemma.get() / totalNumberOfPages * 100 < searchConfig.getMaxFrequencyInPercent()) {
-                    result.add(SearchEngineObject.builder()
-                            .lemma(lemma)
-                            .totalFrequency(totalFrequencyByLemma.get())
-                            //TODO: если передавать сайт и по нему не будет найдено 0 лемм, ошибка - no value present
-                            .dbLemmaList(siteRepository.findByUrl(siteUrl).isPresent() ? List.of(lemmaRepository.findByDbSiteAndLemma(siteRepository.findByUrl(siteUrl).get(), lemma).get()) : lemmaRepository.findByLemma(lemma).get())
-                            .build());
-                }
-            });
-//        if (result.isEmpty() || result == null) return null;
-        result.forEach(this::collectIndexes);
-        result.forEach(this::collectSearchEnginePages);
-        return filterPagesByExisted(result);
-    }
-
-    private void collectIndexes(SearchEngineObject searchEngineObject) {
-        searchEngineObject.setDbIndexList(indexRepository.findByDbLemmaIn(searchEngineObject.getDbLemmaList()));
-    }
-
-    private void collectSearchEnginePages(SearchEngineObject searchEngineObject) {
-        List<SearchEnginePage> pages = new ArrayList<>();
-        searchEngineObject.getDbIndexList().forEach(index -> pages.add(SearchEnginePage.builder().dbPage(index.getDbPage()).rank(index.getRank()).build()));
-        searchEngineObject.setSearchEnginePageList(pages);
-    }
-
-    private List<SearchEngineFinalPage> filterPagesByExisted(List<SearchEngineObject> list) {
-        if (list.isEmpty()) return null;
-        Collections.sort(list);
-        List<SearchEngineFinalPage> finalPageList = new ArrayList<>();
-        list.get(0).getSearchEnginePageList().forEach(searchEnginePage -> finalPageList.add(SearchEngineFinalPage.builder().dbPage(searchEnginePage.getDbPage()).absRel(searchEnginePage.getRank()).build()));
-        List<DBPage> dbPagesToCheck = new ArrayList<>(finalPageList.stream().map(SearchEngineFinalPage::getDbPage).toList());
-//        list.remove(0);
-        //TODO: переписать метод, чтобы не использовать список DBPage, заменить на простой стрим со сбором страниц из finalEnginePage
-        //TODO: проверить, как должен отрабатывать метод, если лист пустой. Может, изменить выдачу на "false"?
-
-        for (SearchEngineObject searchEngineObject : list) {
-            List<SearchEngineFinalPage> semiFinalPageList = new ArrayList<>();
-            List<DBPage> semiDbPagesToCheck = new ArrayList<>();
-            for (SearchEnginePage searchEnginePage : searchEngineObject.getSearchEnginePageList()) {
-                if (dbPagesToCheck.contains(searchEnginePage.getDbPage())) {
-                    semiFinalPageList.add(SearchEngineFinalPage.builder().dbPage(searchEnginePage.getDbPage()).absRel(searchEnginePage.getRank()).build());
-                    semiDbPagesToCheck.add(searchEnginePage.getDbPage());
-                }
-            }
-            //TODO: заменить метод установки maxAbsRel -> чтобы просто stream вычленл максимум по списку оставшихся страниц
-            finalPageList.clear();
-            finalPageList.addAll(semiFinalPageList);
-            dbPagesToCheck.clear();
-            dbPagesToCheck.addAll(semiDbPagesToCheck);
-        }
-        if (finalPageList.isEmpty()) return null;
-        int maxAbsRel = finalPageList.stream().map(SearchEngineFinalPage::getAbsRel).max(Comparator.comparingInt(Integer::intValue)).orElse(1);
-        //TODO: неправильно заполняется "максимальная релевантность ABS, поправить
-        finalPageList.forEach(finalPage -> finalPage.setRelRel((double) finalPage.getAbsRel() / maxAbsRel));
-        return finalPageList;
-    }
-
-    //TODO: затестить поиск на большом резульатею к примеру на "вебинары" выдает релевантность, равную > 1
     private List<SearchDataItem> collectSearchDataItems(String query, String site) {
-        Set<String> searchWords = lemmaFinder.collectLemmas(query).keySet();
-        List<SearchEngineFinalPage> pages = preparePageList(searchWords, site);
-        if (pages == null) return null;
+        Set<String> lemmas = lemmaFinder.collectLemmas(query).keySet();
+        List<SearchQueryResult> pages = collectResultPages(lemmas, site);
+        if (pages.isEmpty()) return new ArrayList<>();
         List<SearchDataItem> result = new ArrayList<>();
         Collections.sort(pages);
         pages.forEach(page -> result.add(SearchDataItem.builder()
-                        .relevance(page.getRelRel())
-                        .title(getTitle(page.getDbPage().getContent()))
-                        .snippet(createSnippet(page.getDbPage().getContent(), searchWords))
-                        .uri(page.getDbPage().getPath())
-                        .site(page.getDbPage().getDbSite().getUrl())
-                        .siteName(page.getDbPage().getDbSite().getName())
-                        .build()));
+                .relevance(page.getRelRel())
+                .title(getTitle(page.getDbPage().getContent()))
+                .snippet(createSnippet(page.getDbPage().getContent(), lemmas))
+                .uri(page.getDbPage().getPath())
+                .site(page.getDbPage().getDbSite().getUrl())
+                .siteName(page.getDbPage().getDbSite().getName())
+                .build()));
         return result;
+    }
+
+    private  List<SearchQueryResult> collectResultPages(Set<String> lemmas, String siteUrl) {
+        List<SearchQueryObject> result = siteRepository.findByUrl(siteUrl).isPresent() ? collectSortedLemmasAsSearchQueryObj(lemmas, siteRepository.findByUrl(siteUrl).get()) : collectSortedLemmasAsSearchQueryObj(lemmas);
+        result.forEach(this::collectIndexes);
+        result.forEach(this::collectSearchQueryPages);
+        return getPreparedSearchQueryResultWithRelRelevance(result.size() == 1 ? createSearchQueryResultWithoutRelRelevance(result.get(0).getSearchQueryPageList()) : filterPagesByExisted(result));
+    }
+
+    private List<SearchQueryObject> collectSortedLemmasAsSearchQueryObj(Set<String> searchWords) {
+        List<SearchQueryObject> result = new ArrayList<>();
+        searchWords.forEach(lemma -> {
+            float totalPagesNumber = (float) pageRepository.count();
+            Float sumFrequencyByLemma = lemmaRepository.sumFrequencyByLemma(lemma);
+            boolean isCorrectLemma = sumFrequencyByLemma != null && (sumFrequencyByLemma / totalPagesNumber * 100 < searchConfig.getMaxFrequencyInPercent());
+            if (isCorrectLemma) result.add(createSearchQueryObject(lemma, sumFrequencyByLemma.intValue()));
+        });
+        return result;
+    }
+
+    private List<SearchQueryObject> collectSortedLemmasAsSearchQueryObj(Set<String> searchWords, DBSite site) {
+        List<SearchQueryObject> result = new ArrayList<>();
+        searchWords.forEach(lemma -> {
+            Float totalPagesNumberBySite = pageRepository.countByDbSite(site);
+            Float sumFrequencyByDbSiteAndLemma = lemmaRepository.sumFrequencyByDbSiteAndLemma(site, lemma);
+            boolean isCorrectLemma = totalPagesNumberBySite != null && sumFrequencyByDbSiteAndLemma != null && (sumFrequencyByDbSiteAndLemma / totalPagesNumberBySite * 100 < searchConfig.getMaxFrequencyInPercent());
+            if (isCorrectLemma) result.add(createSearchQueryObject(lemma, sumFrequencyByDbSiteAndLemma.intValue(), site));
+        });
+        return result;
+    }
+
+    private SearchQueryObject createSearchQueryObject(String lemma, int totalFrequencyByLemma, DBSite site) {
+        if (lemmaRepository.findByDbSiteAndLemma(site, lemma).isEmpty()) return null;
+        return SearchQueryObject.builder()
+                .lemma(lemma)
+                .totalFrequency(totalFrequencyByLemma)
+                .dbLemmaList(List.of(lemmaRepository.findByDbSiteAndLemma(site, lemma).get()))
+                .build();
+    }
+
+    private SearchQueryObject createSearchQueryObject(String lemma, int totalFrequencyByLemma) {
+        return SearchQueryObject.builder()
+                .lemma(lemma)
+                .totalFrequency(totalFrequencyByLemma)
+                .dbLemmaList(lemmaRepository.findByLemma(lemma).get())
+                .build();
+    }
+
+    private void collectIndexes(SearchQueryObject searchQueryObject) {
+        searchQueryObject.setDbIndexList(indexRepository.findByDbLemmaIn(searchQueryObject.getDbLemmaList()));
+    }
+
+    private void collectSearchQueryPages(SearchQueryObject searchQueryObject) {
+        List<SearchQueryPage> pages = new ArrayList<>();
+        searchQueryObject.getDbIndexList().forEach(index -> pages.add(SearchQueryPage.builder().dbPage(index.getDbPage()).rank(index.getRank()).build()));
+        searchQueryObject.setSearchQueryPageList(pages);
+    }
+
+    private List<SearchQueryResult> filterPagesByExisted(List<SearchQueryObject> list) {
+        if (list.isEmpty()) return new ArrayList<>();
+        Collections.sort(list);
+        List<SearchQueryResult> result = createSearchQueryResultWithoutRelRelevance(list.get(0).getSearchQueryPageList());
+        List<SearchQueryPage> pages = list.get(0).getSearchQueryPageList();
+        for (int i = 0; i < list.size() - 1; i++) {
+            pages.retainAll(list.get(i + 1).getSearchQueryPageList());
+            if (pages.isEmpty()) return new ArrayList<>();
+            List<SearchQueryResult> semiResult = updateSearchQueryResult(result, pages);
+            result.clear();
+            result.addAll(semiResult);
+        }
+        return result;
+    }
+
+    private List<SearchQueryResult> getPreparedSearchQueryResultWithRelRelevance(List<SearchQueryResult> preparedPages) {
+        if (preparedPages.isEmpty()) return new ArrayList<>();
+        int maxAbsRel = preparedPages.stream().map(SearchQueryResult::getAbsRel).max(Comparator.comparingInt(Integer::intValue)).orElse(1);
+        preparedPages.forEach(finalPage -> finalPage.setRelRel((double) finalPage.getAbsRel() / maxAbsRel));
+        return preparedPages;
+    }
+
+    private List<SearchQueryResult> createSearchQueryResultWithoutRelRelevance(List<SearchQueryPage> searchQueryPages) {
+        if (searchQueryPages.isEmpty()) return new ArrayList<>();
+        return searchQueryPages.stream().map(this::createSearchQueryResultWithoutRelRelevance).collect(Collectors.toList());
+    }
+
+    private SearchQueryResult createSearchQueryResultWithoutRelRelevance(SearchQueryPage searchQueryPage) {
+        return SearchQueryResult.builder().dbPage(searchQueryPage.getDbPage()).absRel(searchQueryPage.getRank()).build();
+    }
+
+    private List<SearchQueryResult> updateSearchQueryResult(List<SearchQueryResult> searchQueryResults, List<SearchQueryPage> updatedPages) {
+        searchQueryResults.removeIf(result -> !updatedPages.stream().map(SearchQueryPage::getDbPage).toList().contains(result.getDbPage()));
+        searchQueryResults.forEach(result -> updatedPages.stream().filter(page -> page.getDbPage().equals(result.getDbPage())).findFirst().ifPresent(updatedPage -> result.setAbsRel(result.getAbsRel() + updatedPage.getRank())));
+        return searchQueryResults;
     }
 
     //TODO: вылетает за пределы текста, сделать проверку
     private String createSnippet(String content, Set<String> searchWords) {
-        try {
-            String text = Jsoup.parse(content).text();
-            int mid;
-            int endSearchedWord;
-            int start;
-            int end;
-            StringBuilder snippet = new StringBuilder("<p>");
-            int count = 0;
-            for (String word : searchWords) {
-                mid = text.toLowerCase().indexOf(word);
-                start = text.indexOf(" ",mid - searchConfig.getSnippetLength()) + 1;
-                end = text.indexOf(" ", mid + searchConfig.getSnippetLength());
-                endSearchedWord = text.indexOf(" ", mid);
-                snippet.append(count > 0 ? "" : "...").append(text, start, mid).append("<b>").append(text, mid, endSearchedWord).append("</b>").append(text, endSearchedWord, end).append("...");
-                count++;
-            }
-            snippet.append("</p>");
-            return snippet.toString();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "";
-        }
+        return "SNIPPET";
+//        try {
+//            String text = Jsoup.parse(content).text();
+//            int mid;
+//            int endSearchedWord;
+//            int start;
+//            int end;
+//            StringBuilder snippet = new StringBuilder("<p>");
+//            int count = 0;
+//            for (String word : searchWords) {
+//                mid = text.toLowerCase().indexOf(word);
+//                start = text.indexOf(" ",mid - searchConfig.getSnippetLength()) + 1;
+//                end = text.indexOf(" ", mid + searchConfig.getSnippetLength());
+//                endSearchedWord = text.indexOf(" ", mid);
+//                snippet.append(count > 0 ? "" : "...").append(text, start, mid).append("<b>").append(text, mid, endSearchedWord).append("</b>").append(text, endSearchedWord, end).append("...");
+//                count++;
+//            }
+//            snippet.append("</p>");
+//            return snippet.toString();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            return "";
+//        }
     }
 
     private String getTitle(String content) {
@@ -161,11 +192,4 @@ public class SearchServiceImpl implements SearchService {
         }
     }
 
-    //TODO: придумать, как поправить костыль. Необходим, чтобы в Map`у попадали Lemmas с одинаковыми значениями frequency
-    private float setSortedMapKey(Set<Float> dbLemmas, float newKey) {
-        while(true) {
-            if (!dbLemmas.contains(newKey)) return newKey;
-            else newKey += 0.1F;
-        }
-    }
 }

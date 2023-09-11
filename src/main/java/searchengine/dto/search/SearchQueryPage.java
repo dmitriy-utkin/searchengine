@@ -8,13 +8,13 @@ import searchengine.model.DBPage;
 @Data
 @Builder
 @EqualsAndHashCode
-public class SearchEnginePage implements Comparable<SearchEnginePage> {
+public class SearchQueryPage implements Comparable<SearchQueryPage> {
     private DBPage dbPage;
     private int rank;
 
     @Override
-    public int compareTo(SearchEnginePage otherPage) {
-        return Integer.compare(this.rank, otherPage.getRank());
+    public int compareTo(SearchQueryPage otherPage) {
+        return Integer.compare(this.dbPage.getId(), otherPage.getDbPage().getId());
     }
 
 }

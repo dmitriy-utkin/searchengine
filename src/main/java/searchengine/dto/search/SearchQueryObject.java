@@ -9,15 +9,15 @@ import java.util.List;
 
 @Data
 @Builder
-public class SearchEngineObject implements Comparable<SearchEngineObject> {
+public class SearchQueryObject implements Comparable<SearchQueryObject> {
     private String lemma;
     private int totalFrequency;
     private List<DBLemma> dbLemmaList;
     private List<DBIndex> dbIndexList;
-    private List<SearchEnginePage> searchEnginePageList;
+    private List<SearchQueryPage> searchQueryPageList;
 
     @Override
-    public int compareTo(SearchEngineObject otherSearchEngineObject) {
-        return Integer.compare(this.totalFrequency, otherSearchEngineObject.totalFrequency);
+    public int compareTo(SearchQueryObject otherSearchQueryObject) {
+        return Integer.compare(this.totalFrequency, otherSearchQueryObject.totalFrequency);
     }
 }
