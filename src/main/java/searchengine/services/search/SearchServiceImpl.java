@@ -127,9 +127,7 @@ public class SearchServiceImpl implements SearchService {
         for (int i = 0; i < list.size() - 1; i++) {
             pages.retainAll(list.get(i + 1).getSearchQueryPageList());
             if (pages.isEmpty()) return new ArrayList<>();
-            List<SearchQueryResult> semiResult = updateSearchQueryResult(result, pages);
-            result.clear();
-            result.addAll(semiResult);
+            result = updateSearchQueryResult(result, pages);
         }
         return result;
     }
