@@ -10,6 +10,8 @@ spring:
   jpa:
     properties:
       hibernate:
+        jdbc:
+          batch_size: 1500
         dialect: org.hibernate.dialect.MySQL8Dialect
     hibernate:
       ddl-auto: update

@@ -16,7 +16,7 @@ import java.util.Optional;
 public interface LemmaRepository extends JpaRepository<DBLemma, Integer> {
     Optional<DBLemma> findByDbSiteAndLemma(DBSite dbSite, String lemma);
     Optional<List<DBLemma>> findByLemma(String lemma);
-    List<DBLemma> findAllByDbSite(DBSite dbSite);
+    Optional<List<DBLemma>> findAllByDbSite(DBSite dbSite);
     @Query("SELECT SUM(l.frequency) FROM DBLemma l WHERE l.lemma = :lemma")
     Float sumFrequencyByLemma(@Param("lemma") String lemma);
     @Query("SELECT SUM(l.frequency) FROM DBLemma l WHERE l.dbSite = :dbSite AND l.lemma = :lemma")

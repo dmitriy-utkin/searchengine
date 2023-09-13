@@ -3,6 +3,9 @@ package searchengine.services.search;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -37,30 +40,31 @@ public class SearchServiceImpl implements SearchService {
     private final SearchConfig searchConfig;
     private final ErrorOptionConfig errorOptionConfig;
 
+    //TODO: проверить в кач-ве мер по ускорению - обработка только той части спика, которая будет отражена на фронте
+
     @Override
     public ResponseEntity<ResponseService> search(String query, String site, int offset, int limit) {
         if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getEmptyQuerySearchError()), HttpStatus.BAD_REQUEST);
-        if (offset == 0) offset = searchConfig.getDefaultOffset();
-        if (limit == 0) limit = searchConfig.getDefaultLimit();
-        List<SearchDataItem> items = collectSearchDataItems(query, site);
+        Page<SearchDataItem> items = collectSearchDataItems(query, site, offset, limit);
         return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
     }
 
-    private List<SearchDataItem> collectSearchDataItems(String query, String site) {
+    private Page<SearchDataItem> collectSearchDataItems(String query, String site, int offset, int limit) {
         Set<String> lemmas = lemmaFinder.collectLemmas(query).keySet();
         List<SearchQueryResult> pages = collectResultPages(lemmas, site);
-        if (pages.isEmpty()) return new ArrayList<>();
+        if (pages.isEmpty()) return new PageImpl<>(new ArrayList<>());
+        int endIndex = Math.min(offset + limit, pages.size());
         List<SearchDataItem> result = new ArrayList<>();
         Collections.sort(pages);
-        pages.forEach(page -> result.add(SearchDataItem.builder()
+        pages.subList(offset, endIndex).forEach(page -> result.add(SearchDataItem.builder()
                 .relevance(page.getRelRel())
                 .title(getTitle(page.getDbPage().getContent()))
-                .snippet(createSnippet(page.getDbPage().getContent(), lemmas))
+                .snippet(createSnippet(page.getDbPage().getContent(), query))
                 .uri(page.getDbPage().getPath())
                 .site(page.getDbPage().getDbSite().getUrl())
                 .siteName(page.getDbPage().getDbSite().getName())
                 .build()));
-        return result;
+        return new PageImpl<>(result, PageRequest.of(offset, limit), pages.size());
     }
 
     private  List<SearchQueryResult> collectResultPages(Set<String> lemmas, String siteUrl) {
@@ -155,8 +159,23 @@ public class SearchServiceImpl implements SearchService {
     }
 
     //TODO: вылетает за пределы текста, сделать проверку
-    private String createSnippet(String content, Set<String> searchWords) {
-        return "SNIPPET";
+    private String createSnippet(String content, String query) {
+        Map<String, String> equalsWords = lemmaFinder.collectNormalInitialForms(content, query);
+        Set<String> normalQueryForms = lemmaFinder.collectLemmas(query).keySet();
+        String text = lemmaFinder.convertHtmlToText(content).toLowerCase().trim();
+        StringBuilder sb = new StringBuilder();
+        int count = 0;
+        for (String word : normalQueryForms) {
+            int index = text.indexOf(equalsWords.get(word));
+            int start = Math.max(text.indexOf(" ", index - searchConfig.getSnippetLength()), 0);
+            int end = Math.min(text.indexOf(" ", index + searchConfig.getSnippetLength()), text.length());
+            sb.append(count == 0 ? "..." : "").append(text, start, index).append("<b>").append(word).append("</b>")
+                    .append(text, index + equalsWords.get(word).length(), end).append("...");
+            count++;
+        }
+
+
+        return sb.toString();
 //        try {
 //            String text = Jsoup.parse(content).text();
 //            int mid;

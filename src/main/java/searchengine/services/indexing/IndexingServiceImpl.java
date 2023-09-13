@@ -41,6 +41,7 @@ public class IndexingServiceImpl implements IndexingService {
     public static boolean indexationIsRunning = false;
 
     //TODO: поработать над механизмом выставления "ошибок", к примеру в случае, если главная страница недоступна
+    //TODO: доработать механизм выставления статуса "INDEXED" -> сейчас в некоторых сайтах не выставляется статус
 
     @Override
     public ResponseEntity<ResponseService> startIndexing(){

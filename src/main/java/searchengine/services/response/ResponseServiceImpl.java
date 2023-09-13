@@ -3,11 +3,14 @@ package searchengine.services.response;
 import com.sun.istack.NotNull;
 import jdk.jfr.BooleanFlag;
 import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import searchengine.dto.search.SearchDataItem;
 import searchengine.dto.statistics.StatisticsData;
 
 import java.util.List;
 
+@Slf4j
 public enum ResponseServiceImpl {;
 
     private interface Result{@BooleanFlag Boolean getResult(); }
@@ -30,13 +33,14 @@ public enum ResponseServiceImpl {;
         }
 
         @Value public static class SearchSuccessResponseService implements ResponseService, Result {
-            public SearchSuccessResponseService(List<SearchDataItem> data) {
+            public SearchSuccessResponseService(Page<SearchDataItem> items) {
                 this.result = true;
-                this.count = data == null ? 0 : data.size();
-                this.data = data;
+                this.count = items.isEmpty() ? 0 : items.getTotalElements();
+                this.data = items.getContent();
+                log.info("Found " + count + " pages.");
             }
             Boolean result;
-            int count;
+            long count;
             List<SearchDataItem> data;
         }
 

@@ -7,9 +7,7 @@ import org.jsoup.Jsoup;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Slf4j
 @Component
@@ -52,11 +50,45 @@ public class LemmaFinder {
             }
         }
 
-
         return lemmas;
     }
 
-    private String convertHtmlToText(String content) {
+    public Map<String, String> collectNormalInitialForms(String content, String query) {
+        String text = convertHtmlToText(content);
+
+        Map<String, String> result = new HashMap<>();
+        String[] words = getWordsArray(text);
+        Set<String> normalQueryWords = collectLemmas(query).keySet();
+
+        for (String word : words) {
+
+            if (normalQueryWords.size() == result.size()) {
+                return result;
+            }
+
+            if (word.isBlank()) {
+                continue;
+            }
+
+            List<String> wordBaseForms = luceneMorphology.getMorphInfo(word);
+            if (anyFormsBelongToParticle(wordBaseForms)) {
+                continue;
+            }
+
+            List<String> normalForms = luceneMorphology.getNormalForms(word);
+            if (normalForms.isEmpty()) {
+                continue;
+            }
+
+            if (normalQueryWords.stream().anyMatch(normalForms.get(0)::equals)) {
+                result.put(normalForms.get(0), word);
+            }
+        }
+
+        return result;
+    }
+
+    public String convertHtmlToText(String content) {
         return Jsoup.parse(content).text();
     }
 

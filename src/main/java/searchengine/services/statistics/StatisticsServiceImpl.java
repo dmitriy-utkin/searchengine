@@ -19,6 +19,7 @@ import searchengine.services.indexing.IndexingServiceImpl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +47,8 @@ public class StatisticsServiceImpl implements StatisticsService {
         List<Site> siteList = sites.getSites();
         for (Site site : siteList) {
             String url = site.getUrl().endsWith("/") ? site.getUrl().substring(0, site.getUrl().length() - 1) : site.getUrl();
-            DBSite dbSite = siteRepository.findByUrl(url).isPresent() ? siteRepository.findByUrl(url).get() : null;
+            Optional<DBSite> optionalDbSite = siteRepository.findByUrl(url);
+            DBSite dbSite = optionalDbSite.orElse(null);
             if (dbSite != null) {
                 DetailedStatisticsItem item = DetailedStatisticsItem.builder()
                         .url(url)
@@ -55,7 +57,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                         .statusTime(dbSite.getStatusTime().getTime())
                         .error(dbSite.getLastError())
                         .pages(pageRepository.findByDbSite(dbSite).size())
-                        .lemmas(lemmaRepository.findAllByDbSite(dbSite).size())
+                        .lemmas(lemmaRepository.findAllByDbSite(dbSite).get().size())
                         .build();
                 detailedStatisticsItems.add(item);
             }
