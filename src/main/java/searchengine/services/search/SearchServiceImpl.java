@@ -41,6 +41,7 @@ public class SearchServiceImpl implements SearchService {
     private final ErrorOptionConfig errorOptionConfig;
 
     //TODO: проверить в кач-ве мер по ускорению - обработка только той части спика, которая будет отражена на фронте
+    //TODO: неправильно отрабатывает отображение постранично. На фронте добавляются страницы после пролистывания. Актуально для списков от 10+ результатов поиска
 
     @Override
     public ResponseEntity<ResponseService> search(String query, String site, int offset, int limit) {
@@ -90,7 +91,9 @@ public class SearchServiceImpl implements SearchService {
         searchWords.forEach(lemma -> {
             Float totalPagesNumberBySite = pageRepository.countByDbSite(site);
             Float sumFrequencyByDbSiteAndLemma = lemmaRepository.sumFrequencyByDbSiteAndLemma(site, lemma);
-            boolean isCorrectLemma = totalPagesNumberBySite != null && sumFrequencyByDbSiteAndLemma != null && (sumFrequencyByDbSiteAndLemma / totalPagesNumberBySite * 100 < searchConfig.getMaxFrequencyInPercent());
+            boolean isCorrectLemma = totalPagesNumberBySite != null
+                    && sumFrequencyByDbSiteAndLemma != null
+                    && (sumFrequencyByDbSiteAndLemma / totalPagesNumberBySite * 100 < searchConfig.getMaxFrequencyInPercent());
             if (isCorrectLemma) result.add(createSearchQueryObject(lemma, sumFrequencyByDbSiteAndLemma.intValue(), site));
         });
         return result;
@@ -121,6 +124,10 @@ public class SearchServiceImpl implements SearchService {
         List<SearchQueryPage> pages = new ArrayList<>();
         searchQueryObject.getDbIndexList().forEach(index -> pages.add(SearchQueryPage.builder().dbPage(index.getDbPage()).rank(index.getRank()).build()));
         searchQueryObject.setSearchQueryPageList(pages);
+    }
+
+    private void collectSearchQueryPagesWithoutPreparedIndexList(SearchQueryObject searchQueryObject) {
+        searchQueryObject.setSearchQueryPageList(indexRepository.findByDbLemmaIn(searchQueryObject.getDbLemmaList()).stream().map(index -> SearchQueryPage.builder().dbPage(index.getDbPage()).rank(index.getRank()).build()).toList());
     }
 
     private List<SearchQueryResult> filterPagesByExisted(List<SearchQueryObject> list) {
@@ -164,40 +171,18 @@ public class SearchServiceImpl implements SearchService {
         Set<String> normalQueryForms = lemmaFinder.collectLemmas(query).keySet();
         String text = lemmaFinder.convertHtmlToText(content).toLowerCase().trim();
         StringBuilder sb = new StringBuilder();
+        int plusAndMinusSnippetLength = searchConfig.getSnippetLength() / normalQueryForms.size() / 2;
         int count = 0;
         for (String word : normalQueryForms) {
             int index = text.indexOf(equalsWords.get(word));
-            int start = Math.max(text.indexOf(" ", index - searchConfig.getSnippetLength()), 0);
-            int end = Math.min(text.indexOf(" ", index + searchConfig.getSnippetLength()), text.length());
+            int start = index == 0 ? 0 : Math.max(text.indexOf(" ", index - plusAndMinusSnippetLength), index);
+            int end = Math.min(text.indexOf(" ", index + plusAndMinusSnippetLength), text.length());
             sb.append(count == 0 ? "..." : "").append(text, start, index).append("<b>").append(word).append("</b>")
                     .append(text, index + equalsWords.get(word).length(), end).append("...");
             count++;
         }
 
-
         return sb.toString();
-//        try {
-//            String text = Jsoup.parse(content).text();
-//            int mid;
-//            int endSearchedWord;
-//            int start;
-//            int end;
-//            StringBuilder snippet = new StringBuilder("<p>");
-//            int count = 0;
-//            for (String word : searchWords) {
-//                mid = text.toLowerCase().indexOf(word);
-//                start = text.indexOf(" ",mid - searchConfig.getSnippetLength()) + 1;
-//                end = text.indexOf(" ", mid + searchConfig.getSnippetLength());
-//                endSearchedWord = text.indexOf(" ", mid);
-//                snippet.append(count > 0 ? "" : "...").append(text, start, mid).append("<b>").append(text, mid, endSearchedWord).append("</b>").append(text, endSearchedWord, end).append("...");
-//                count++;
-//            }
-//            snippet.append("</p>");
-//            return snippet.toString();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            return "";
-//        }
     }
 
     private String getTitle(String content) {

@@ -34,11 +34,10 @@ public class StatisticsServiceImpl implements StatisticsService {
     public ResponseEntity<ResponseService> getStatistics() {
         StatisticsData statisticsData = new StatisticsData();
 
-
         TotalStatistics totalStatistics = TotalStatistics.builder()
-                .sites(siteRepository.findAll().size())
-                .pages(pageRepository.findAll().size())
-                .lemmas(lemmaRepository.findAll().size())
+                .sites((int) siteRepository.count())
+                .pages((int) pageRepository.count())
+                .lemmas((int) lemmaRepository.count())
                 .indexing(!IndexingServiceImpl.indexationIsRunning)
                 .build();
         statisticsData.setTotal(totalStatistics);
@@ -50,21 +49,22 @@ public class StatisticsServiceImpl implements StatisticsService {
             Optional<DBSite> optionalDbSite = siteRepository.findByUrl(url);
             DBSite dbSite = optionalDbSite.orElse(null);
             if (dbSite != null) {
-                DetailedStatisticsItem item = DetailedStatisticsItem.builder()
-                        .url(url)
-                        .name(dbSite.getName())
-                        .status(dbSite.getStatus().toString())
-                        .statusTime(dbSite.getStatusTime().getTime())
-                        .error(dbSite.getLastError())
-                        .pages(pageRepository.findByDbSite(dbSite).size())
-                        .lemmas(lemmaRepository.findAllByDbSite(dbSite).get().size())
-                        .build();
-                detailedStatisticsItems.add(item);
+                detailedStatisticsItems.add(createDetailedStatisticsItem(url, dbSite));
             }
         }
-
         statisticsData.setDetailed(detailedStatisticsItems);
-
         return new ResponseEntity<>(new ResponseServiceImpl.StatisticSuccessResponseService(statisticsData), HttpStatus.OK);
+    }
+
+    private DetailedStatisticsItem createDetailedStatisticsItem(String url, DBSite dbSite) {
+        return DetailedStatisticsItem.builder()
+                .url(url)
+                .name(dbSite.getName())
+                .status(dbSite.getStatus().toString())
+                .statusTime(dbSite.getStatusTime().getTime())
+                .error(dbSite.getLastError())
+                .pages(pageRepository.countByDbSite(dbSite).intValue())
+                .lemmas((int) lemmaRepository.countByDbSite(dbSite))
+                .build();
     }
 }

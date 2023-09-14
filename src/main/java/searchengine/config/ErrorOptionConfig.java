@@ -15,4 +15,10 @@ public class ErrorOptionConfig {
     private String indexOnePageError;
     private String mainPageUnavailableError;
     private String emptyQuerySearchError;
+    private String badRequestError;
+    private String unauthorizedError;
+    private String forbiddenError;
+    private String methodNotAllowedError;
+    private String notFoundError;
+    private String internalServerError;
 }

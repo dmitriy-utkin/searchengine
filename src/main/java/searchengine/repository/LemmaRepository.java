@@ -21,5 +21,5 @@ public interface LemmaRepository extends JpaRepository<DBLemma, Integer> {
     Float sumFrequencyByLemma(@Param("lemma") String lemma);
     @Query("SELECT SUM(l.frequency) FROM DBLemma l WHERE l.dbSite = :dbSite AND l.lemma = :lemma")
     Float sumFrequencyByDbSiteAndLemma(@Param("dbSite") DBSite dbSite, @Param("lemma") String lemma);
-
+    long countByDbSite(DBSite dbSite);
 }

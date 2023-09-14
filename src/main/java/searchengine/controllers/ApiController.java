@@ -1,12 +1,8 @@
 package searchengine.controllers;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import searchengine.config.SearchConfig;
-import searchengine.model.DBSite;
 import searchengine.services.indexing.IndexingService;
 import searchengine.services.response.ResponseService;
 import searchengine.services.search.SearchService;
@@ -20,7 +16,6 @@ public class ApiController {
     private final StatisticsService statisticsService;
     private final IndexingService indexingService;
     private final SearchService searchService;
-    private final SearchConfig searchConfig;
 
     @GetMapping("/statistics")
     public ResponseEntity<ResponseService> statistics() {

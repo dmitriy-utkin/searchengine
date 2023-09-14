@@ -1,5 +1,10 @@
 server:
   port: 8080
+#  error:
+#    path: /error-handler
+#    whitelabel:
+#      enabled: false
+
 spring:
   datasource:
     username: root
@@ -18,10 +23,10 @@ spring:
     show-sql: true
 
 search-settings:
-  maxFrequencyInPercent: 30
+  maxFrequencyInPercent: 80
   defaultOffset: 0
   defaultLimit: 20
-  snippetLength: 50
+  snippetLength: 230
 
 error-settings:
   startIndexingError: Индексация уже запущена
@@ -29,6 +34,12 @@ error-settings:
   indexOnePageError: Данная страница находится за пределами сайтов, указанных в конфигурационном файле
   mainPageUnavailableError: Главная страница недоступна
   emptyQuerySearchError: Задан пустой поисковый запрос
+  badRequestError: Неправильный запрос
+  unauthorizedError: Ошибка авторизации
+  forbiddenError: Доступ к запрошенному ресурсу запрещен
+  methodNotAllowedError: Метод недоступен
+  notFoundError: Указанная страница не найдена
+  internalServerError: Внутрення ошибка сервера
 
 indexing-settings:
   userAgent: DeepSearchBot
@@ -39,18 +50,18 @@ indexing-settings:
   sites:
     - url: https://ipfran.ru/
       name: IP Fran
-    - url: https://www.lutherancathedral.ru/
-      name: Lutheran Cathedral
+#    - url: https://www.lutherancathedral.ru/
+#      name: Lutheran Cathedral
 #    - url: https://www.svetlovka.ru/
 #      name: Svetlovka
-    - url: https://www.programmaster.ru
-      name: Program Master
-    - url: https://dombulgakova.ru/
-      name: Дом Булгакова
-    - url: https://ezo-restoran.ru
-      name: ЭЗО / Ресторан
-    - url: https://zdraste-schastie.ru
-      name: Здрасте счастье / Ресторан
+#    - url: https://www.programmaster.ru
+#      name: Program Master
+#    - url: https://dombulgakova.ru/
+#      name: Дом Булгакова
+#    - url: https://ezo-restoran.ru
+#      name: ЭЗО / Ресторан
+#    - url: https://zdraste-schastie.ru
+#      name: Здрасте счастье / Ресторан
     - url: https://et-cetera.ru/mobile/
       name: ET Cetera
     - url: https://skillbox.ru

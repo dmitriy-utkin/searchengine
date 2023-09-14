@@ -5,9 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import searchengine.config.ErrorOptionConfig;
 import searchengine.config.JsoupConfig;
 import searchengine.config.Site;
@@ -17,6 +19,7 @@ import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
+import searchengine.services.response.ExceptionHandler;
 import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
 
@@ -45,43 +48,59 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public ResponseEntity<ResponseService> startIndexing(){
-        if (siteRepository.existsByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getStartIndexingError()), HttpStatus.BAD_REQUEST);
-        indexationIsRunning = true;
-        clearDataBase(true, true, true, true);
-        sitesList.getSites().forEach(site -> siteRepository.save(createSiteEntry(site)));
-        siteRepository.findAll().forEach(dbSite -> new Thread(() -> {
-            new ForkJoinPool().invoke(new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite.getId(), dbSite.getUrl() + "/", new ConcurrentHashMap<>()));
-            updateSiteStatus(dbSite, Status.INDEXED);
-        }).start());
-        return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
+        try {
+            if (siteRepository.existsByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getStartIndexingError()), HttpStatus.BAD_REQUEST);
+            indexationIsRunning = true;
+            clearDataBase(true, true, true, true);
+            sitesList.getSites().forEach(site -> siteRepository.save(createSiteEntry(site)));
+            siteRepository.findAll().forEach(dbSite -> new Thread(() -> {
+                new ForkJoinPool().invoke(new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite.getId(), dbSite.getUrl() + "/", new ConcurrentHashMap<>()));
+                updateSiteStatus(dbSite, Status.INDEXED);
+            }).start());
+            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
+        } catch (Exception exception) {
+            ExceptionHandler exceptionHandler = new ExceptionHandler(exception, errorOptionConfig);
+            return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(exceptionHandler.getErrorMessage()), exceptionHandler.getHttpStatus());
+        }
     }
 
     @Override
     public ResponseEntity<ResponseService> stopIndexing() {
-        if (!siteRepository.existsByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getStopIndexingError()), HttpStatus.BAD_REQUEST);
         try {
-            indexationIsRunning = false;
-            List<DBSite> sites = siteRepository.findByStatus(Status.INDEXING);
-            sites.forEach(site -> updateSiteStatus(site, Status.FAILED, "Индексация остановлена пользователем"));
-        } catch (Exception e) {
-            e.printStackTrace();
+            if (!siteRepository.existsByStatus(Status.INDEXING))
+                return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getStopIndexingError()), HttpStatus.BAD_REQUEST);
+            try {
+                indexationIsRunning = false;
+                List<DBSite> sites = siteRepository.findByStatus(Status.INDEXING);
+                sites.forEach(site -> updateSiteStatus(site, Status.FAILED, "Индексация остановлена пользователем"));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
+        } catch (Exception exception) {
+            ExceptionHandler exceptionHandler = new ExceptionHandler(exception, errorOptionConfig);
+            return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(exceptionHandler.getErrorMessage()), exceptionHandler.getHttpStatus());
         }
-        return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
     }
 
     @Override
     public ResponseEntity<ResponseService> indexPage(String newUrl) {
-        String preparedUrl = newUrl.toLowerCase().trim();
-        if (sitesList.getSites().stream().map(Site::getUrl).noneMatch(preparedUrl::startsWith)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getIndexOnePageError()), HttpStatus.BAD_REQUEST);
-        new Thread(() -> {
-            List<DBSite> sites = siteRepository.findAll().stream().filter(site -> preparedUrl.startsWith(site.getUrl())).toList();
-            updateSiteStatus(sites.get(0), Status.INDEXING);
-            clearDataBaseByOnePage(pageRepository.findByPathAndDbSite(preparedUrl.replace(sites.get(0).getUrl(), ""), sites.get(0)));
-            DBPage dbPage = pageRepository.save(createNewPageEntry(preparedUrl, sites.get(0)));
-            updateDataBaseForOneIndexedPage(sites.get(0), dbPage, new HtmlParser(sites.get(0), dbPage, lemmaFinder, lemmaRepository));
-            updateSiteStatus(sites.get(0), Status.INDEXED);
-        }).start();
-        return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
+        try {
+            String preparedUrl = newUrl.toLowerCase().trim();
+            if (sitesList.getSites().stream().map(Site::getUrl).noneMatch(preparedUrl::startsWith)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getIndexOnePageError()), HttpStatus.BAD_REQUEST);
+            new Thread(() -> {
+                List<DBSite> sites = siteRepository.findAll().stream().filter(site -> preparedUrl.startsWith(site.getUrl())).toList();
+                updateSiteStatus(sites.get(0), Status.INDEXING);
+                clearDataBaseByOnePage(pageRepository.findByPathAndDbSite(preparedUrl.replace(sites.get(0).getUrl(), ""), sites.get(0)));
+                DBPage dbPage = pageRepository.save(createNewPageEntry(preparedUrl, sites.get(0)));
+                updateDataBaseForOneIndexedPage(sites.get(0), dbPage, new HtmlParser(sites.get(0), dbPage, lemmaFinder, lemmaRepository));
+                updateSiteStatus(sites.get(0), Status.INDEXED);
+            }).start();
+            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
+        } catch (Exception exception) {
+            ExceptionHandler exceptionHandler = new ExceptionHandler(exception, errorOptionConfig);
+            return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(exceptionHandler.getErrorMessage()), exceptionHandler.getHttpStatus());
+        }
     }
 
     private DBSite createSiteEntry(Site site) {
