@@ -16,40 +16,41 @@ public enum ResponseServiceImpl {;
     private interface Result{@BooleanFlag Boolean getResult(); }
     private interface Error{@NotNull String getError(); }
 
-        @Value public static class IndexingSuccessResponseService implements ResponseService, Result {
-            public IndexingSuccessResponseService() {
-                this.result = true;
-            }
-            Boolean result;
+    @Value public static class IndexingSuccessResponseService implements ResponseService, Result {
+        public IndexingSuccessResponseService() {
+            this.result = true;
         }
+        Boolean result;
+    }
 
-        @Value public static class StatisticSuccessResponseService implements ResponseService, Result {
-            public StatisticSuccessResponseService(StatisticsData statisticsData) {
-                this.statistics = statisticsData;
-                this.result = true;
-            }
-            Boolean result;
-            StatisticsData statistics;
+    @Value public static class StatisticSuccessResponseService implements ResponseService, Result {
+        public StatisticSuccessResponseService(StatisticsData statisticsData) {
+            this.statistics = statisticsData;
+            this.result = true;
         }
+        Boolean result;
+        StatisticsData statistics;
+    }
 
-        @Value public static class SearchSuccessResponseService implements ResponseService, Result {
-            public SearchSuccessResponseService(Page<SearchDataItem> items) {
-                this.result = true;
-                this.count = items.isEmpty() ? 0 : items.getTotalElements();
-                this.data = items.getContent();
-                log.info("Found " + count + " pages.");
-            }
-            Boolean result;
-            long count;
-            List<SearchDataItem> data;
+    @Value public static class SearchSuccessResponseService implements ResponseService, Result {
+        public SearchSuccessResponseService(Page<SearchDataItem> items) {
+            this.result = true;
+            this.count = items.isEmpty() ? 0 : items.getTotalElements();
+            this.data = items.getContent();
+            log.info("Found " + count + " pages.");
         }
+        Boolean result;
+        long count;
+        List<SearchDataItem> data;
+    }
 
-        @Value public static class BadRequest implements ResponseService, Result, Error {
-            public BadRequest(String error) {
-                this.error = error;
-                this.result = false;
-            }
-            Boolean result;
-            String error;
+    @Value public static class ErrorResponse implements ResponseService, Result, Error {
+        public ErrorResponse(String error) {
+            this.result = false;
+            this.error = error;
         }
+        Boolean result;
+        String error;
+    }
+
 }

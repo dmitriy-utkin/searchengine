@@ -5,11 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
 import searchengine.config.ErrorOptionConfig;
 import searchengine.config.JsoupConfig;
 import searchengine.config.Site;
@@ -19,7 +17,6 @@ import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
-import searchengine.services.response.ExceptionHandler;
 import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
 
@@ -49,18 +46,17 @@ public class IndexingServiceImpl implements IndexingService {
     @Override
     public ResponseEntity<ResponseService> startIndexing(){
         try {
-            if (siteRepository.existsByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getStartIndexingError()), HttpStatus.BAD_REQUEST);
+            if (siteRepository.existsByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getStartIndexingError()), HttpStatus.METHOD_NOT_ALLOWED);
             indexationIsRunning = true;
-            clearDataBase(true, true, true, true);
+            clearDataBase();
             sitesList.getSites().forEach(site -> siteRepository.save(createSiteEntry(site)));
             siteRepository.findAll().forEach(dbSite -> new Thread(() -> {
-                new ForkJoinPool().invoke(new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite.getId(), dbSite.getUrl() + "/", new ConcurrentHashMap<>()));
+                new ForkJoinPool().invoke(new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite, dbSite.getUrl() + "/", new ConcurrentHashMap<>()));
                 updateSiteStatus(dbSite, Status.INDEXED);
             }).start());
             return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
         } catch (Exception exception) {
-            ExceptionHandler exceptionHandler = new ExceptionHandler(exception, errorOptionConfig);
-            return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(exceptionHandler.getErrorMessage()), exceptionHandler.getHttpStatus());
+            return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getInternalServerError()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -68,7 +64,7 @@ public class IndexingServiceImpl implements IndexingService {
     public ResponseEntity<ResponseService> stopIndexing() {
         try {
             if (!siteRepository.existsByStatus(Status.INDEXING))
-                return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getStopIndexingError()), HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getStopIndexingError()), HttpStatus.METHOD_NOT_ALLOWED);
             try {
                 indexationIsRunning = false;
                 List<DBSite> sites = siteRepository.findByStatus(Status.INDEXING);
@@ -78,8 +74,8 @@ public class IndexingServiceImpl implements IndexingService {
             }
             return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
         } catch (Exception exception) {
-            ExceptionHandler exceptionHandler = new ExceptionHandler(exception, errorOptionConfig);
-            return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(exceptionHandler.getErrorMessage()), exceptionHandler.getHttpStatus());
+            log.error("Error in method \".stopIndexing()\":" + exception.getMessage());
+            return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getInternalServerError()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -87,19 +83,23 @@ public class IndexingServiceImpl implements IndexingService {
     public ResponseEntity<ResponseService> indexPage(String newUrl) {
         try {
             String preparedUrl = newUrl.toLowerCase().trim();
-            if (sitesList.getSites().stream().map(Site::getUrl).noneMatch(preparedUrl::startsWith)) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getIndexOnePageError()), HttpStatus.BAD_REQUEST);
+            if (sitesList.getSites().stream().map(Site::getUrl).noneMatch(preparedUrl::startsWith))
+                return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getIndexOnePageError()), HttpStatus.NOT_FOUND);
             new Thread(() -> {
+                indexationIsRunning = true;
                 List<DBSite> sites = siteRepository.findAll().stream().filter(site -> preparedUrl.startsWith(site.getUrl())).toList();
                 updateSiteStatus(sites.get(0), Status.INDEXING);
+                Status initialStatus = sites.get(0).getStatus();
                 clearDataBaseByOnePage(pageRepository.findByPathAndDbSite(preparedUrl.replace(sites.get(0).getUrl(), ""), sites.get(0)));
                 DBPage dbPage = pageRepository.save(createNewPageEntry(preparedUrl, sites.get(0)));
                 updateDataBaseForOneIndexedPage(sites.get(0), dbPage, new HtmlParser(sites.get(0), dbPage, lemmaFinder, lemmaRepository));
-                updateSiteStatus(sites.get(0), Status.INDEXED);
+                updateSiteStatus(sites.get(0), initialStatus);
+                indexationIsRunning = false;
             }).start();
             return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
         } catch (Exception exception) {
-            ExceptionHandler exceptionHandler = new ExceptionHandler(exception, errorOptionConfig);
-            return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(exceptionHandler.getErrorMessage()), exceptionHandler.getHttpStatus());
+            log.error("Error in method \".indexPage(String newUrl)\":" + exception.getMessage());
+            return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getInternalServerError()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -117,9 +117,8 @@ public class IndexingServiceImpl implements IndexingService {
 
     private void updateSiteStatus(DBSite site, Status newStatus) {
         if (newStatus.equals(Status.INDEXED) && !indexationIsRunning) return;
-        newStatus = pageRepository.findByDbSite(site).size() == 1 ? Status.FAILED : newStatus;
+        if (pageRepository.countByDbSite(site) == 1) {updateSiteStatus(site, Status.FAILED, errorOptionConfig.getMainPageUnavailableError()); return;}
         site.setStatus(newStatus);
-        if (newStatus.equals(Status.FAILED)) site.setLastError(errorOptionConfig.getMainPageUnavailableError());
         site.setStatusTime(new Date());
         siteRepository.saveAndFlush(site);
         log.info("Site status for \"" + site.getUrl() + "\" was changed to \"" + newStatus + "\".");
@@ -135,11 +134,11 @@ public class IndexingServiceImpl implements IndexingService {
 
     }
 
-    private void clearDataBase(boolean indexes, boolean lemmas, boolean pages, boolean sites) {
-        if (indexes) {indexRepository.deleteAllInBatch(); log.info("Indexes was deleted.");}
-        if (lemmas) {lemmaRepository.deleteAllInBatch(); log.info("Lemmas was deleted.");}
-        if (pages) {pageRepository.deleteAllInBatch(); log.info("Pages was deleted.");}
-        if (sites) {siteRepository.deleteAllInBatch(); log.info("Sites was deleted.");}
+    private void clearDataBase() {
+        indexRepository.deleteAllInBatch(); log.info("Indexes was deleted.");
+        lemmaRepository.deleteAllInBatch(); log.info("Lemmas was deleted.");
+        pageRepository.deleteAllInBatch(); log.info("Pages was deleted.");
+        siteRepository.deleteAllInBatch(); log.info("Sites was deleted.");
     }
 
     private DBPage createNewPageEntry(String uri, DBSite site) {
@@ -170,11 +169,19 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     private void clearDataBaseByOnePage(Optional<DBPage> optionalDBPage) {
-        if (optionalDBPage.isEmpty()) return;
-        List<DBLemma> lemmas = indexRepository.findByDbPage(optionalDBPage.get()).get().stream().map(dbIndex -> {DBLemma dbLemma = dbIndex.getDbLemma(); dbLemma.setFrequency(dbLemma.getFrequency() - 1); return dbLemma;}).toList();
-        lemmaRepository.saveAll(lemmas);
-        indexRepository.deleteByDbPage(optionalDBPage.get());
-        pageRepository.deleteById(optionalDBPage.get().getId());
+        try {
+            if (optionalDBPage.isEmpty()) return;
+            List<DBLemma> lemmas = indexRepository.findByDbPage(optionalDBPage.get()).get().stream().map(dbIndex -> {
+                DBLemma dbLemma = dbIndex.getDbLemma();
+                dbLemma.setFrequency(dbLemma.getFrequency() - 1);
+                return dbLemma;
+            }).toList();
+            lemmaRepository.saveAll(lemmas);
+            indexRepository.deleteByDbPage(optionalDBPage.get());
+            pageRepository.deleteById(optionalDBPage.get().getId());
+        } catch (Exception e) {
+            log.error("Error in method clearDataBaseByOnePage(Optional<DBPage> optionalDBPage): " + e.getMessage());
+        }
 
     }
 

@@ -19,7 +19,6 @@ import searchengine.services.indexing.IndexingServiceImpl;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -46,11 +45,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         List<Site> siteList = sites.getSites();
         for (Site site : siteList) {
             String url = site.getUrl().endsWith("/") ? site.getUrl().substring(0, site.getUrl().length() - 1) : site.getUrl();
-            Optional<DBSite> optionalDbSite = siteRepository.findByUrl(url);
-            DBSite dbSite = optionalDbSite.orElse(null);
-            if (dbSite != null) {
-                detailedStatisticsItems.add(createDetailedStatisticsItem(url, dbSite));
-            }
+            siteRepository.findByUrl(url).ifPresent(dbSite -> detailedStatisticsItems.add(createDetailedStatisticsItem(url, dbSite)));
         }
         statisticsData.setDetailed(detailedStatisticsItems);
         return new ResponseEntity<>(new ResponseServiceImpl.StatisticSuccessResponseService(statisticsData), HttpStatus.OK);

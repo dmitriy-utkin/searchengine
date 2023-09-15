@@ -23,7 +23,7 @@ spring:
     show-sql: true
 
 search-settings:
-  maxFrequencyInPercent: 80
+  maxFrequencyInPercent: 60
   defaultOffset: 0
   defaultLimit: 20
   snippetLength: 230
@@ -50,10 +50,10 @@ indexing-settings:
   sites:
     - url: https://ipfran.ru/
       name: IP Fran
-#    - url: https://www.lutherancathedral.ru/
-#      name: Lutheran Cathedral
-#    - url: https://www.svetlovka.ru/
-#      name: Svetlovka
+    - url: https://www.lutherancathedral.ru/
+      name: Lutheran Cathedral
+    - url: https://www.svetlovka.ru/
+      name: Svetlovka
 #    - url: https://www.programmaster.ru
 #      name: Program Master
 #    - url: https://dombulgakova.ru/
@@ -64,9 +64,9 @@ indexing-settings:
 #      name: Здрасте счастье / Ресторан
     - url: https://et-cetera.ru/mobile/
       name: ET Cetera
-    - url: https://skillbox.ru
-      name: Skillbox
-    - url: https://lenta.ru
-      name: Лента.ру
+#    - url: https://skillbox.ru
+#      name: Skillbox
+#    - url: https://lenta.ru
+#      name: Лента.ру
     - url: https://www.playback.ru
       name: PlayBack

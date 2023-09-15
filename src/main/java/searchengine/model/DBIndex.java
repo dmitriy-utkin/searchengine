@@ -15,7 +15,7 @@ import javax.transaction.Transactional;
 @AllArgsConstructor
 @ToString(exclude = {"dbPage", "dbLemma"})
 @Transactional
-@Table(name = "indexes")
+@Table(name = "indexes", indexes = {@Index(name = "lemma_index", columnList = "lemma_id")})
 @DependsOn({"pages", "lemmas"})
 public class DBIndex {
 

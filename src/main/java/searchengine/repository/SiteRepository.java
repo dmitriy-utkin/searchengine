@@ -15,5 +15,4 @@ public interface SiteRepository extends JpaRepository<DBSite, Integer> {
     Optional<DBSite> findByUrl(String url);
     List<DBSite> findByStatus(Status status);
     Boolean existsByStatus(Status status);
-    Optional<Integer> countByStatus(Status status);
 }

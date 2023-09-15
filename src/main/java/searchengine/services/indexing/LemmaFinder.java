@@ -53,16 +53,15 @@ public class LemmaFinder {
         return lemmas;
     }
 
-    public Map<String, String> collectNormalInitialForms(String content, String query) {
+    public Map<String, String> collectNormalInitialForms(String content, Set<String> query) {
         String text = convertHtmlToText(content);
 
         Map<String, String> result = new HashMap<>();
         String[] words = getWordsArray(text);
-        Set<String> normalQueryWords = collectLemmas(query).keySet();
 
         for (String word : words) {
 
-            if (normalQueryWords.size() == result.size()) {
+            if (query.size() == result.size()) {
                 return result;
             }
 
@@ -80,7 +79,7 @@ public class LemmaFinder {
                 continue;
             }
 
-            if (normalQueryWords.stream().anyMatch(normalForms.get(0)::equals)) {
+            if (query.stream().anyMatch(normalForms.get(0)::equals)) {
                 result.put(normalForms.get(0), word);
             }
         }

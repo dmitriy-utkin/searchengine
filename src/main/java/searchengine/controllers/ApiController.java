@@ -37,7 +37,6 @@ public class ApiController {
         return indexingService.indexPage(url);
     }
 
-
     @GetMapping("/search")
     public ResponseEntity<ResponseService> search(@RequestParam String query,
                                                   @RequestParam(required = false) String site,

@@ -40,14 +40,19 @@ public class SearchServiceImpl implements SearchService {
     private final SearchConfig searchConfig;
     private final ErrorOptionConfig errorOptionConfig;
 
-    //TODO: проверить в кач-ве мер по ускорению - обработка только той части спика, которая будет отражена на фронте
-    //TODO: неправильно отрабатывает отображение постранично. На фронте добавляются страницы после пролистывания. Актуально для списков от 10+ результатов поиска
+    //TODO: проверить в кач-ве мер по ускорению - обработка только той части списка, которая будет отражена на фронте
+    //TODO: неправильно отрабатывает отображение постранично. На фронте добавляются страницы после перелистывания. Актуально для списков от 10+ результатов поиска
 
     @Override
     public ResponseEntity<ResponseService> search(String query, String site, int offset, int limit) {
-        if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.BadRequest(errorOptionConfig.getEmptyQuerySearchError()), HttpStatus.BAD_REQUEST);
-        Page<SearchDataItem> items = collectSearchDataItems(query, site, offset, limit);
-        return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
+        try {
+            if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getEmptyQuerySearchError()), HttpStatus.BAD_REQUEST);
+            Page<SearchDataItem> items = collectSearchDataItems(query, site, offset, limit);
+            return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
+        } catch (Exception exception) {
+            log.error("Error in method \".search(String query, String site, int offset, int limit)\":" + exception.getMessage());
+            return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getInternalServerError()), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     private Page<SearchDataItem> collectSearchDataItems(String query, String site, int offset, int limit) {
@@ -60,7 +65,7 @@ public class SearchServiceImpl implements SearchService {
         pages.subList(offset, endIndex).forEach(page -> result.add(SearchDataItem.builder()
                 .relevance(page.getRelRel())
                 .title(getTitle(page.getDbPage().getContent()))
-                .snippet(createSnippet(page.getDbPage().getContent(), query))
+                .snippet(createSnippet(page.getDbPage().getContent(), page.getLemmas()))
                 .uri(page.getDbPage().getPath())
                 .site(page.getDbPage().getDbSite().getUrl())
                 .siteName(page.getDbPage().getDbSite().getName())
@@ -68,11 +73,13 @@ public class SearchServiceImpl implements SearchService {
         return new PageImpl<>(result, PageRequest.of(offset, limit), pages.size());
     }
 
-    private  List<SearchQueryResult> collectResultPages(Set<String> lemmas, String siteUrl) {
-        List<SearchQueryObject> result = siteRepository.findByUrl(siteUrl).isPresent() ? collectSortedLemmasAsSearchQueryObj(lemmas, siteRepository.findByUrl(siteUrl).get()) : collectSortedLemmasAsSearchQueryObj(lemmas);
-        result.forEach(this::collectIndexes);
-        result.forEach(this::collectSearchQueryPages);
-        return getPreparedSearchQueryResultWithRelRelevance(result.size() == 1 ? createSearchQueryResultWithoutRelRelevance(result.get(0).getSearchQueryPageList()) : filterPagesByExisted(result));
+    private List<SearchQueryResult> collectResultPages(Set<String> lemmas, String siteUrl) {
+        List<SearchQueryObject> searchQueryObjects = siteRepository.findByUrl(siteUrl).isPresent() ? collectSortedLemmasAsSearchQueryObj(lemmas, siteRepository.findByUrl(siteUrl).get()) : collectSortedLemmasAsSearchQueryObj(lemmas);
+        searchQueryObjects.forEach(this::collectIndexes);
+        searchQueryObjects.forEach(this::collectSearchQueryPages);
+        List<SearchQueryResult> result = getPreparedSearchQueryResultWithRelRelevance(searchQueryObjects.size() == 1 ? createSearchQueryResultWithoutRelRelevance(searchQueryObjects.get(0).getSearchQueryPageList()) : filterPagesByExisted(searchQueryObjects));
+        result.forEach(searchResult -> searchResult.setLemmas(searchQueryObjects.stream().map(SearchQueryObject::getLemma).collect(Collectors.toSet())));
+        return result;
     }
 
     private List<SearchQueryObject> collectSortedLemmasAsSearchQueryObj(Set<String> searchWords) {
@@ -126,10 +133,6 @@ public class SearchServiceImpl implements SearchService {
         searchQueryObject.setSearchQueryPageList(pages);
     }
 
-    private void collectSearchQueryPagesWithoutPreparedIndexList(SearchQueryObject searchQueryObject) {
-        searchQueryObject.setSearchQueryPageList(indexRepository.findByDbLemmaIn(searchQueryObject.getDbLemmaList()).stream().map(index -> SearchQueryPage.builder().dbPage(index.getDbPage()).rank(index.getRank()).build()).toList());
-    }
-
     private List<SearchQueryResult> filterPagesByExisted(List<SearchQueryObject> list) {
         if (list.isEmpty()) return new ArrayList<>();
         Collections.sort(list);
@@ -165,20 +168,18 @@ public class SearchServiceImpl implements SearchService {
         return searchQueryResults;
     }
 
-    //TODO: вылетает за пределы текста, сделать проверку
-    private String createSnippet(String content, String query) {
+    private String createSnippet(String content, Set<String> query) {
         Map<String, String> equalsWords = lemmaFinder.collectNormalInitialForms(content, query);
-        Set<String> normalQueryForms = lemmaFinder.collectLemmas(query).keySet();
         String text = lemmaFinder.convertHtmlToText(content).toLowerCase().trim();
         StringBuilder sb = new StringBuilder();
-        int plusAndMinusSnippetLength = searchConfig.getSnippetLength() / normalQueryForms.size() / 2;
+        int plusAndMinusSnippetLength = searchConfig.getSnippetLength() / query.size() / 2;
         int count = 0;
-        for (String word : normalQueryForms) {
+        for (String word : query) {
             int index = text.indexOf(equalsWords.get(word));
-            int start = index == 0 ? 0 : Math.max(text.indexOf(" ", index - plusAndMinusSnippetLength), index);
+            int start = index == 0 ? 0 : Math.max(text.indexOf(" ", index - plusAndMinusSnippetLength), 0);
             int end = Math.min(text.indexOf(" ", index + plusAndMinusSnippetLength), text.length());
             sb.append(count == 0 ? "..." : "").append(text, start, index).append("<b>").append(word).append("</b>")
-                    .append(text, index + equalsWords.get(word).length(), end).append("...");
+                    .append(text, index + equalsWords.get(word).length(), end == -1 ? text.length() : end).append("...");
             count++;
         }
 

@@ -26,7 +26,7 @@ public class SiteParseAction extends RecursiveAction {
     private LemmaRepository lemmaRepository;
     private LemmaFinder lemmaFinder;
     private IndexRepository indexRepository;
-    private int siteId;
+    private DBSite site;
     private String url;
     private ConcurrentHashMap<String, Boolean> processedLink;
 
@@ -37,22 +37,19 @@ public class SiteParseAction extends RecursiveAction {
             Thread.sleep(config.getSleep());
             Connection.Response response = Jsoup.connect(url).userAgent(config.getUserAgent()).referrer(config.getReferrer()).timeout(config.getTimeout()).ignoreHttpErrors(true).followRedirects(config.isRedirect()).execute();
             Document doc = response.parse();
-            DBSite site = siteRepository.findById(siteId).get();
             DBPage page = DBPage.builder().path(url.replace(site.getUrl(), "")).dbSite(site).code(response.statusCode()).content(doc.outerHtml()).build();
             HtmlParser htmlParse = new HtmlParser(site, page, lemmaFinder, lemmaRepository);
             updateDataBase(url, site, page, htmlParse.getLemmas(), htmlParse.getIndexes());
             doc.select("body").select("a").forEach(link -> {
                 String uri = link.absUrl("href");
                 if (isCorrectLink(uri, site.getUrl())) {
-                    SiteParseAction action = new SiteParseAction(config, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, siteId, uri, processedLink);
+                    SiteParseAction action = new SiteParseAction(config, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, site, uri, processedLink);
                     action.fork();
                     action.join();
                 } else {
                     processedLink.put(uri, false);
                 }
             });
-            //TODO: как понять, что индексация завершена...
-            //TODO: переделать "отлов" ошибок...
         } catch (InterruptedException | IOException e) {
             log.error(e.getMessage());
         }
