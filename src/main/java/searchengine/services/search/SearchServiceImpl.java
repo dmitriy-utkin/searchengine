@@ -194,7 +194,7 @@ public class SearchServiceImpl implements SearchService {
             int index = text.indexOf(equalsWords.get(word));
             int start = index == 0 ? 0 : Math.max(text.indexOf(" ", index - plusAndMinusSnippetLength), 0);
             int end = Math.min(text.indexOf(" ", index + plusAndMinusSnippetLength), text.length());
-            sb.append(count == 0 ? "..." : "").append(text, start, index).append("<b>").append(word).append("</b>")
+            sb.append(count == 0 ? "..." : "").append(text, start, index).append("<b>").append(equalsWords.get(word)).append("</b>")
                     .append(text, index + equalsWords.get(word).length(), end == -1 ? text.length() : end).append("...");
             count++;
         }

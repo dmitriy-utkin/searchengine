@@ -56,7 +56,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                 .name(dbSite.getName())
                 .status(dbSite.getStatus().toString())
                 .statusTime(dbSite.getStatusTime().getTime())
-                .error(dbSite.getLastError())
+                .error(dbSite.getLastError() == null ? "Без ошибок" : dbSite.getLastError())
                 .pages(pageRepository.countByDbSite(dbSite).intValue())
                 .lemmas((int) lemmaRepository.countByDbSite(dbSite))
                 .build();
