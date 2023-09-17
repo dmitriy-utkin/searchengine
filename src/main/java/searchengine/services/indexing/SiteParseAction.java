@@ -35,9 +35,19 @@ public class SiteParseAction extends RecursiveAction {
         if (!IndexingServiceImpl.indexationIsRunning) Thread.currentThread().interrupt();
         try {
             Thread.sleep(config.getSleep());
-            Connection.Response response = Jsoup.connect(url).userAgent(config.getUserAgent()).referrer(config.getReferrer()).timeout(config.getTimeout()).ignoreHttpErrors(true).followRedirects(config.isRedirect()).execute();
+            Connection.Response response = Jsoup.connect(url)
+                    .userAgent(config.getUserAgent())
+                    .referrer(config.getReferrer())
+                    .timeout(config.getTimeout())
+                    .ignoreHttpErrors(config.isIgnoreHttpErrors())
+                    .followRedirects(config.isRedirect())
+                    .execute();
             Document doc = response.parse();
-            DBPage page = DBPage.builder().path(url.replace(site.getUrl(), "")).dbSite(site).code(response.statusCode()).content(doc.outerHtml()).build();
+            DBPage page = DBPage.builder()
+                    .path(url.replace(site.getUrl(), ""))
+                    .dbSite(site).code(response.statusCode())
+                    .content(doc.outerHtml())
+                    .build();
             HtmlParser htmlParse = new HtmlParser(site, page, lemmaFinder, lemmaRepository);
             updateDataBase(url, site, page, htmlParse.getLemmas(), htmlParse.getIndexes());
             doc.select("body").select("a").forEach(link -> {
@@ -85,5 +95,4 @@ public class SiteParseAction extends RecursiveAction {
                 !url.contains("#") &&
                 !url.contains("?");
     }
-
 }

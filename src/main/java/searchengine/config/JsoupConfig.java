@@ -15,4 +15,5 @@ public class JsoupConfig {
     private boolean redirect;
     private long sleep;
     private int timeout;
+    private boolean ignoreHttpErrors;
 }

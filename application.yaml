@@ -31,7 +31,8 @@ search-settings:
 error-settings:
   startIndexingError: Индексация уже запущена
   stopIndexingError: Индексация не запущена
-  indexOnePageError: Данная страница находится за пределами сайтов, указанных в конфигурационном файле
+  indexPageSiteIsOutOfTheListError: Данная страница находится за пределами сайтов, указанных в конфигурационном файле
+  indexPageSiteIsInIndexingProcessError: Данный сайт находится в процессе индексации
   mainPageUnavailableError: Главная страница недоступна
   emptyQuerySearchError: Задан пустой поисковый запрос
   badRequestError: Неправильный запрос
@@ -47,6 +48,7 @@ indexing-settings:
   redirect: true
   sleep: 200
   timeout: 10000
+  ignoreHttpErrors: true
   sites:
     - url: https://ipfran.ru/
       name: IP Fran

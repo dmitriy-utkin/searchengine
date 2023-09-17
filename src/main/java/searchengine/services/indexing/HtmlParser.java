@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Optional;
 
 public class HtmlParser {
-
     public HtmlParser(DBSite site, DBPage page, LemmaFinder lemmaFinder, LemmaRepository lemmaRepository) {
         this.site = site;
         this.page = page;
@@ -22,7 +21,7 @@ public class HtmlParser {
         this.lemmaRepository = lemmaRepository;
         this.lemmas = new ArrayList<>();
         this.indexes = new ArrayList<>();
-        collectLemmasAndIndexes(String.valueOf(page.getCode()).startsWith("4") || String.valueOf(page.getCode()).startsWith("5"));
+        collectLemmasAndIndexes(isCorrectCodeCheck(page.getCode()));
     }
 
     private final DBSite site;
@@ -34,20 +33,27 @@ public class HtmlParser {
     @Getter
     private List<DBIndex> indexes;
 
-    private void collectLemmasAndIndexes(boolean isIncorrectPageCode) {
-        if (isIncorrectPageCode) {lemmas = null; indexes = null; return;}
+    private void collectLemmasAndIndexes(boolean isCorrectCode) {
+        if (!isCorrectCode) {lemmas = null; indexes = null; return;}
         Map<String, Integer> lemmasMap = lemmaFinder.collectLemmas(page.getContent());
         Optional<List<DBLemma>> dbLemmas = lemmaRepository.findAllByDbSite(site);
         final List<ExistedDbLemma> existedBySiteLemmas = new ArrayList<>();
-        dbLemmas.ifPresent(dbLemmaList -> existedBySiteLemmas.addAll(dbLemmaList.stream().map(ExistedDbLemma::new).toList()));
+        dbLemmas.ifPresent(dbLemmaList -> existedBySiteLemmas.addAll(dbLemmaList.stream()
+                .map(ExistedDbLemma::new).toList()));
         lemmasMap.keySet().forEach(lemma -> {
-            ExistedDbLemma existedLemma = existedBySiteLemmas.stream().filter(l -> l.getDbLemma().getLemma().equals(lemma)).findFirst().orElse(null);
+            ExistedDbLemma existedLemma = existedBySiteLemmas.stream()
+                    .filter(l -> l.getDbLemma().getLemma().equals(lemma))
+                    .findFirst().orElse(null);
             if (existedLemma != null) {
                 updateLemmaAndIndexesLists(updateLemmaFrequency(existedLemma.getDbLemma()), lemmasMap);
             } else {
                 updateLemmaAndIndexesLists(createLemmaEntry(site, lemma), lemmasMap);
             }
         });
+    }
+
+    private boolean isCorrectCodeCheck(int code) {
+        return String.valueOf(code).startsWith("4") || String.valueOf(code).startsWith("5");
     }
 
     private void updateLemmaAndIndexesLists(DBLemma dbLemma, Map<String, Integer> lemmasMap) {

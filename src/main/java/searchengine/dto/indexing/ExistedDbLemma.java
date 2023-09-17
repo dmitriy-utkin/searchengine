@@ -5,7 +5,6 @@ import searchengine.model.DBLemma;
 
 @Data
 public class ExistedDbLemma implements Comparable<DBLemma>{
-
     public ExistedDbLemma(DBLemma dbLemma) {
         this.dbLemma = dbLemma;
         this.frequency = dbLemma.getFrequency();

@@ -12,7 +12,6 @@ import java.util.Optional;
 @Repository
 @Transactional
 public interface PageRepository extends JpaRepository<DBPage, Integer> {
-    List<DBPage> findByDbSite(DBSite dbSite);
     Optional<DBPage> findByPathAndDbSite(String path, DBSite dbSite);
     Float countByDbSite(DBSite dbSite);
 }

@@ -16,5 +16,4 @@ public class SearchQueryPage implements Comparable<SearchQueryPage> {
     public int compareTo(SearchQueryPage otherPage) {
         return Integer.compare(this.dbPage.getId(), otherPage.getDbPage().getId());
     }
-
 }

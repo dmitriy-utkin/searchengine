@@ -46,12 +46,18 @@ public class IndexingServiceImpl implements IndexingService {
     @Override
     public ResponseEntity<ResponseService> startIndexing(){
         try {
-            if (siteRepository.existsByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getStartIndexingError()), HttpStatus.METHOD_NOT_ALLOWED);
+            if (siteRepository.existsByStatus(Status.INDEXING))
+                return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getStartIndexingError()), HttpStatus.METHOD_NOT_ALLOWED);
             indexationIsRunning = true;
             clearDataBase();
             sitesList.getSites().forEach(site -> siteRepository.save(createSiteEntry(site)));
             siteRepository.findAll().forEach(dbSite -> new Thread(() -> {
-                new ForkJoinPool().invoke(new SiteParseAction(jsoupConfig, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, dbSite, dbSite.getUrl() + "/", new ConcurrentHashMap<>()));
+                new ForkJoinPool().invoke(
+                        new SiteParseAction(jsoupConfig,
+                                siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository,
+                                dbSite, dbSite.getUrl() + "/",
+                                new ConcurrentHashMap<>())
+                );
                 updateSiteStatus(dbSite, Status.INDEXED);
             }).start());
             return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
@@ -84,16 +90,19 @@ public class IndexingServiceImpl implements IndexingService {
         try {
             String preparedUrl = newUrl.toLowerCase().trim();
             if (sitesList.getSites().stream().map(Site::getUrl).noneMatch(preparedUrl::startsWith))
-                return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getIndexOnePageError()), HttpStatus.NOT_FOUND);
+                return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getIndexPageSiteIsOutOfTheListError()), HttpStatus.NOT_FOUND);
+            DBSite dbSite = siteRepository.findAll().stream()
+                    .filter(site -> preparedUrl.startsWith(site.getUrl())).toList().get(0);
+            if (dbSite.getStatus().equals(Status.INDEXING))
+                return new ResponseEntity<>(new ResponseServiceImpl.ErrorResponse(errorOptionConfig.getIndexPageSiteIsInIndexingProcessError()), HttpStatus.METHOD_NOT_ALLOWED);
             new Thread(() -> {
                 indexationIsRunning = true;
-                List<DBSite> sites = siteRepository.findAll().stream().filter(site -> preparedUrl.startsWith(site.getUrl())).toList();
-                updateSiteStatus(sites.get(0), Status.INDEXING);
-                Status initialStatus = sites.get(0).getStatus();
-                clearDataBaseByOnePage(pageRepository.findByPathAndDbSite(preparedUrl.replace(sites.get(0).getUrl(), ""), sites.get(0)));
-                DBPage dbPage = pageRepository.save(createNewPageEntry(preparedUrl, sites.get(0)));
-                updateDataBaseForOneIndexedPage(sites.get(0), dbPage, new HtmlParser(sites.get(0), dbPage, lemmaFinder, lemmaRepository));
-                updateSiteStatus(sites.get(0), initialStatus);
+                Status initialStatus = dbSite.getStatus();
+                updateSiteStatus(dbSite, Status.INDEXING);
+                clearDataBaseByOnePage(pageRepository.findByPathAndDbSite(preparedUrl.replace(dbSite.getUrl(), ""), dbSite));
+                DBPage dbPage = pageRepository.save(createNewPageEntry(preparedUrl, dbSite));
+                updateDataBaseForOneIndexedPage(dbSite, dbPage, new HtmlParser(dbSite, dbPage, lemmaFinder, lemmaRepository));
+                updateSiteStatus(dbSite, initialStatus);
                 indexationIsRunning = false;
             }).start();
             return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
@@ -187,8 +196,8 @@ public class IndexingServiceImpl implements IndexingService {
 
     private void updateDataBaseForOneIndexedPage(DBSite site, DBPage page, HtmlParser htmlParse) {
         pageRepository.save(page);
-        if (htmlParse.getLemmas() != null) lemmaRepository.saveAll(htmlParse.getLemmas());
-        if (htmlParse.getIndexes() != null) indexRepository.saveAll(htmlParse.getIndexes());
+        if (htmlParse.getLemmas() != null) lemmaRepository.saveAllAndFlush(htmlParse.getLemmas());
+        if (htmlParse.getIndexes() != null) indexRepository.saveAllAndFlush(htmlParse.getIndexes());
         site.setStatusTime(new Date());
         siteRepository.save(site);
     }

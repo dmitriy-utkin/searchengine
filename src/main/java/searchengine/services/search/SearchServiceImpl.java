@@ -74,11 +74,15 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private List<SearchQueryResult> collectResultPages(Set<String> lemmas, String siteUrl) {
-        List<SearchQueryObject> searchQueryObjects = siteRepository.findByUrl(siteUrl).isPresent() ? collectSortedLemmasAsSearchQueryObj(lemmas, siteRepository.findByUrl(siteUrl).get()) : collectSortedLemmasAsSearchQueryObj(lemmas);
+        List<SearchQueryObject> searchQueryObjects = siteRepository.findByUrl(siteUrl).isPresent() ?
+                collectSortedLemmasAsSearchQueryObj(lemmas, siteRepository.findByUrl(siteUrl).get()) : collectSortedLemmasAsSearchQueryObj(lemmas);
         searchQueryObjects.forEach(this::collectIndexes);
         searchQueryObjects.forEach(this::collectSearchQueryPages);
-        List<SearchQueryResult> result = getPreparedSearchQueryResultWithRelRelevance(searchQueryObjects.size() == 1 ? createSearchQueryResultWithoutRelRelevance(searchQueryObjects.get(0).getSearchQueryPageList()) : filterPagesByExisted(searchQueryObjects));
-        result.forEach(searchResult -> searchResult.setLemmas(searchQueryObjects.stream().map(SearchQueryObject::getLemma).collect(Collectors.toSet())));
+        List<SearchQueryResult> result = getPreparedSearchQueryResultWithRelRelevance(searchQueryObjects.size() == 1 ?
+                createSearchQueryResultWithoutRelRelevance(searchQueryObjects.get(0).getSearchQueryPageList()) : filterPagesByExisted(searchQueryObjects));
+        result.forEach(searchResult -> searchResult.setLemmas(searchQueryObjects.stream()
+                .map(SearchQueryObject::getLemma)
+                .collect(Collectors.toSet())));
         return result;
     }
 
@@ -129,7 +133,10 @@ public class SearchServiceImpl implements SearchService {
 
     private void collectSearchQueryPages(SearchQueryObject searchQueryObject) {
         List<SearchQueryPage> pages = new ArrayList<>();
-        searchQueryObject.getDbIndexList().forEach(index -> pages.add(SearchQueryPage.builder().dbPage(index.getDbPage()).rank(index.getRank()).build()));
+        searchQueryObject.getDbIndexList().forEach(index -> pages.add(SearchQueryPage.builder()
+                                                                                    .dbPage(index.getDbPage())
+                                                                                    .rank(index.getRank())
+                                                                                    .build()));
         searchQueryObject.setSearchQueryPageList(pages);
     }
 
@@ -148,23 +155,32 @@ public class SearchServiceImpl implements SearchService {
 
     private List<SearchQueryResult> getPreparedSearchQueryResultWithRelRelevance(List<SearchQueryResult> preparedPages) {
         if (preparedPages.isEmpty()) return new ArrayList<>();
-        int maxAbsRel = preparedPages.stream().map(SearchQueryResult::getAbsRel).max(Comparator.comparingInt(Integer::intValue)).orElse(1);
+        int maxAbsRel = preparedPages.stream()
+                .map(SearchQueryResult::getAbsRel)
+                .max(Comparator.comparingInt(Integer::intValue)).orElse(1);
         preparedPages.forEach(finalPage -> finalPage.setRelRel((double) finalPage.getAbsRel() / maxAbsRel));
         return preparedPages;
     }
 
     private List<SearchQueryResult> createSearchQueryResultWithoutRelRelevance(List<SearchQueryPage> searchQueryPages) {
         if (searchQueryPages.isEmpty()) return new ArrayList<>();
-        return searchQueryPages.stream().map(this::createSearchQueryResultWithoutRelRelevance).collect(Collectors.toList());
+        return searchQueryPages.stream()
+                .map(this::createSearchQueryResultWithoutRelRelevance).collect(Collectors.toList());
     }
 
     private SearchQueryResult createSearchQueryResultWithoutRelRelevance(SearchQueryPage searchQueryPage) {
-        return SearchQueryResult.builder().dbPage(searchQueryPage.getDbPage()).absRel(searchQueryPage.getRank()).build();
+        return SearchQueryResult.builder()
+                .dbPage(searchQueryPage.getDbPage())
+                .absRel(searchQueryPage.getRank()).build();
     }
 
     private List<SearchQueryResult> updateSearchQueryResult(List<SearchQueryResult> searchQueryResults, List<SearchQueryPage> updatedPages) {
-        searchQueryResults.removeIf(result -> !updatedPages.stream().map(SearchQueryPage::getDbPage).toList().contains(result.getDbPage()));
-        searchQueryResults.forEach(result -> updatedPages.stream().filter(page -> page.getDbPage().equals(result.getDbPage())).findFirst().ifPresent(updatedPage -> result.setAbsRel(result.getAbsRel() + updatedPage.getRank())));
+        searchQueryResults.removeIf(result -> !updatedPages.stream()
+                .map(SearchQueryPage::getDbPage)
+                .toList().contains(result.getDbPage()));
+        searchQueryResults.forEach(result -> updatedPages.stream()
+                .filter(page -> page.getDbPage().equals(result.getDbPage()))
+                .findFirst().ifPresent(updatedPage -> result.setAbsRel(result.getAbsRel() + updatedPage.getRank())));
         return searchQueryResults;
     }
 
