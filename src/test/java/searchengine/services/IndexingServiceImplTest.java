@@ -3,8 +3,7 @@ package searchengine.services;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import searchengine.config.Site;
-import searchengine.model.DBSite;
+import searchengine.model.Site;
 import searchengine.model.Status;
 import searchengine.services.indexing.IndexingServiceImpl;
 
@@ -14,12 +13,12 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 class IndexingServiceImplTest {
 
     IndexingServiceImpl indexingServiceImpl;
-    Site site;
+    searchengine.config.Site site;
 
     @BeforeEach
     void beforeEach() {
         indexingServiceImpl = new IndexingServiceImpl();
-        site = new Site();
+        site = new searchengine.config.Site();
         site.setName("Test");
         site.setUrl("http://testPage.ru");
     }
@@ -32,7 +31,7 @@ class IndexingServiceImplTest {
     @Test
     @DisplayName("Get DBSite object")
     void getDBSite() {
-        DBSite dbSiteExpected = DBSite.builder()
+        Site dbSiteExpected = Site.builder()
                 .url("http://testPage.ru")
                 .name("Test")
                 .status(Status.INDEXING)

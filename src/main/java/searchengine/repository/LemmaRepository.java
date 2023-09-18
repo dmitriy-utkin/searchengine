@@ -5,21 +5,21 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-import searchengine.model.DBLemma;
-import searchengine.model.DBSite;
+import searchengine.model.Lemma;
+import searchengine.model.Site;
 
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 @Transactional
-public interface LemmaRepository extends JpaRepository<DBLemma, Integer> {
-    Optional<DBLemma> findByDbSiteAndLemma(DBSite dbSite, String lemma);
-    Optional<List<DBLemma>> findByLemma(String lemma);
-    Optional<List<DBLemma>> findAllByDbSite(DBSite dbSite);
-    @Query("SELECT SUM(l.frequency) FROM DBLemma l WHERE l.lemma = :lemma")
+public interface LemmaRepository extends JpaRepository<Lemma, Integer> {
+    Optional<Lemma> findBySiteAndLemma(Site site, String lemma);
+    Optional<List<Lemma>> findByLemma(String lemma);
+    Optional<List<Lemma>> findAllBySite(Site site);
+    @Query("SELECT SUM(l.frequency) FROM Lemma l WHERE l.lemma = :lemma")
     Float sumFrequencyByLemma(@Param("lemma") String lemma);
-    @Query("SELECT SUM(l.frequency) FROM DBLemma l WHERE l.dbSite = :dbSite AND l.lemma = :lemma")
-    Float sumFrequencyByDbSiteAndLemma(@Param("dbSite") DBSite dbSite, @Param("lemma") String lemma);
-    long countByDbSite(DBSite dbSite);
+    @Query("SELECT SUM(l.frequency) FROM Lemma l WHERE l.site = :site AND l.lemma = :lemma")
+    Float sumFrequencyBySiteAndLemma(@Param("site") Site site, @Param("lemma") String lemma);
+    long countBySite(Site site);
 }

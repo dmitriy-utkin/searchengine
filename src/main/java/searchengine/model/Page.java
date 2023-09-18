@@ -4,6 +4,7 @@ import lombok.*;
 import org.springframework.context.annotation.DependsOn;
 
 import javax.persistence.*;
+import javax.persistence.Index;
 import javax.transaction.Transactional;
 
 @Entity
@@ -17,7 +18,7 @@ import javax.transaction.Transactional;
 @Transactional
 @Table(name = "pages", indexes = {@Index(name = "path_site_index", columnList = "site_id, path", unique = true)})
 @DependsOn("sites")
-public class DBPage {
+public class Page {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,7 +29,7 @@ public class DBPage {
 
     @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
-    private DBSite dbSite;
+    private Site site;
 
     @Column(nullable = false)
     private int code;

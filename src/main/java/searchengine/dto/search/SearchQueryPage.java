@@ -3,13 +3,13 @@ package searchengine.dto.search;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import searchengine.model.DBPage;
+import searchengine.model.Page;
 
 @Data
 @Builder
 @EqualsAndHashCode
 public class SearchQueryPage implements Comparable<SearchQueryPage> {
-    private DBPage dbPage;
+    private Page dbPage;
     private int rank;
 
     @Override

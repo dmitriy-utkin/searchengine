@@ -2,8 +2,8 @@ package searchengine.dto.search;
 
 import lombok.Builder;
 import lombok.Data;
-import searchengine.model.DBIndex;
-import searchengine.model.DBLemma;
+import searchengine.model.Index;
+import searchengine.model.Lemma;
 
 import java.util.List;
 
@@ -12,8 +12,8 @@ import java.util.List;
 public class SearchQueryObject implements Comparable<SearchQueryObject> {
     private String lemma;
     private int totalFrequency;
-    private List<DBLemma> dbLemmaList;
-    private List<DBIndex> dbIndexList;
+    private List<Lemma> dbLemmaList;
+    private List<Index> dbIndexList;
     private List<SearchQueryPage> searchQueryPageList;
 
     @Override

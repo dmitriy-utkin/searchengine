@@ -15,9 +15,9 @@ import javax.transaction.Transactional;
 @AllArgsConstructor
 @ToString(exclude = {"dbPage", "dbLemma"})
 @Transactional
-@Table(name = "indexes", indexes = {@Index(name = "lemma_index", columnList = "lemma_id")})
+@Table(name = "indexes", indexes = {@javax.persistence.Index(name = "lemma_index", columnList = "lemma_id")})
 @DependsOn({"pages", "lemmas"})
-public class DBIndex {
+public class Index {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,11 +25,11 @@ public class DBIndex {
 
     @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.EAGER)
     @JoinColumn(name = "page_id", nullable = false)
-    private DBPage dbPage;
+    private Page page;
 
     @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.EAGER)
     @JoinColumn(name = "lemma_id", nullable = false)
-    private DBLemma dbLemma;
+    private Lemma lemma;
 
     @Column(name = "lemma_rank", nullable = false)
     private int rank;

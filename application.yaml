@@ -9,8 +9,7 @@ spring:
   datasource:
     username: root
     password: testTest
-    url:
-      jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true
 
   jpa:
     properties:
@@ -31,6 +30,7 @@ search-settings:
 error-settings:
   startIndexingError: Индексация уже запущена
   stopIndexingError: Индексация не запущена
+  indexingStoppedByUserError: Индексация остановлена пользователем
   indexPageSiteIsOutOfTheListError: Данная страница находится за пределами сайтов, указанных в конфигурационном файле
   indexPageSiteIsInIndexingProcessError: Данный сайт находится в процессе индексации
   mainPageUnavailableError: Главная страница недоступна
@@ -52,10 +52,10 @@ indexing-settings:
   sites:
     - url: https://ipfran.ru/
       name: IP Fran
-    - url: https://www.lutherancathedral.ru/
-      name: Lutheran Cathedral
-    - url: https://www.svetlovka.ru/
-      name: Svetlovka
+#    - url: https://www.lutherancathedral.ru/
+#      name: Lutheran Cathedral
+#    - url: https://www.svetlovka.ru/
+#      name: Svetlovka
 #    - url: https://www.programmaster.ru
 #      name: Program Master
 #    - url: https://dombulgakova.ru/
@@ -64,11 +64,11 @@ indexing-settings:
 #      name: ЭЗО / Ресторан
 #    - url: https://zdraste-schastie.ru
 #      name: Здрасте счастье / Ресторан
-    - url: https://et-cetera.ru/mobile/
-      name: ET Cetera
+#    - url: https://et-cetera.ru/mobile/
+#      name: ET Cetera
 #    - url: https://skillbox.ru
 #      name: Skillbox
 #    - url: https://lenta.ru
 #      name: Лента.ру
-    - url: https://www.playback.ru
-      name: PlayBack
+#    - url: https://www.playback.ru
+#      name: PlayBack

@@ -26,7 +26,7 @@ public class SiteParseAction extends RecursiveAction {
     private LemmaRepository lemmaRepository;
     private LemmaFinder lemmaFinder;
     private IndexRepository indexRepository;
-    private DBSite site;
+    private Site site;
     private String url;
     private ConcurrentHashMap<String, Boolean> processedLink;
 
@@ -43,9 +43,9 @@ public class SiteParseAction extends RecursiveAction {
                     .followRedirects(config.isRedirect())
                     .execute();
             Document doc = response.parse();
-            DBPage page = DBPage.builder()
+            Page page = Page.builder()
                     .path(url.replace(site.getUrl(), ""))
-                    .dbSite(site).code(response.statusCode())
+                    .site(site).code(response.statusCode())
                     .content(doc.outerHtml())
                     .build();
             HtmlParser htmlParse = new HtmlParser(site, page, lemmaFinder, lemmaRepository);
@@ -53,7 +53,11 @@ public class SiteParseAction extends RecursiveAction {
             doc.select("body").select("a").forEach(link -> {
                 String uri = link.absUrl("href");
                 if (isCorrectLink(uri, site.getUrl())) {
-                    SiteParseAction action = new SiteParseAction(config, siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository, site, uri, processedLink);
+                    SiteParseAction action = new SiteParseAction(config,
+                            siteRepository, pageRepository,
+                            lemmaRepository, lemmaFinder,
+                            indexRepository, site,
+                            uri, processedLink);
                     action.fork();
                     action.join();
                 } else {
@@ -65,7 +69,11 @@ public class SiteParseAction extends RecursiveAction {
         }
     }
 
-    private synchronized void updateDataBase(String url, DBSite site, DBPage page, List<DBLemma> lemmas, List<DBIndex> indexes) {
+    private synchronized void updateDataBase(String url,
+                                             Site site,
+                                             Page page,
+                                             List<Lemma> lemmas,
+                                             List<Index> indexes) {
         if (!IndexingServiceImpl.indexationIsRunning) return;
         processedLink.put(url, true);
         site.setStatusTime(new Date());

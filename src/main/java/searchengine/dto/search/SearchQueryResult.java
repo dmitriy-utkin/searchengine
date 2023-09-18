@@ -2,14 +2,14 @@ package searchengine.dto.search;
 
 import lombok.Builder;
 import lombok.Data;
-import searchengine.model.DBPage;
+import searchengine.model.Page;
 
 import java.util.Set;
 
 @Data
 @Builder
 public class SearchQueryResult implements Comparable<SearchQueryResult> {
-    private DBPage dbPage;
+    private Page dbPage;
     private int absRel;
     private double relRel;
     private Set<String> lemmas;

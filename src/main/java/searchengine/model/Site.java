@@ -18,7 +18,7 @@ import java.util.Date;
 @Transactional
 @Table(name = "sites")
 @DynamicUpdate
-public class DBSite {
+public class Site {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

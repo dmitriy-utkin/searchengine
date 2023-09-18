@@ -1,10 +1,13 @@
-# searchengine
+# SEARCHENGINE
+___
 
 ### Education project
-
+![Static Badge](https://img.shields.io/badge/Java-17-blue)
+![Static Badge](https://img.shields.io/badge/Spring_Boot-2.7.1-green)
+![Static Badge](https://img.shields.io/badge/Searchengine-application-orange)
 ---
 
-Hello there :wave:
+Hey there :wave:
 
 Here you can find a search engine module, it is working with prepared root sites url list to make the full indexation for all the child links and create the index by page/word.
 
@@ -13,7 +16,7 @@ You can use the backend part like a search module for any website.
 ![searchengine_preview](src/main/resources/searchengineReadme/searchengine_preview.gif)
 ___
 
-## How does it work?
+## How does it work? _SEARCH_
 
 To make a search by marked sites (you can add it to the config file to have an opportunity of searching by the pages of this site) was created a search index.
 
@@ -41,9 +44,53 @@ The "normal form" is a base form of each word. I used a lucene.morphology api ([
 3. Then apps filters of the pages by SearchQueryObject (with sorting by totalFrequency from low to high) for the presence of pages in the previous object
 4. Finally, apps make a SearchQueryResult for the page with existed searched word and sort it by relative relevance. Relative relevance building by formula `"abs/maxAbs" - by list of QueryResuls`
 
+## How does it work? _INDEXING_
+
+To be able to search some words on page, you should index it. This app can make an indexing from the root page of any sites to the all child links in multithreading mode with help of the following tools:
+* ForkJoin object (FJO) `extends RecursiveAction`, where all the magic happens. This obj make a checking this link and collect all the date about page (in accordance to the Page doc, you may find it bellow)
+* Then FJO create a HtmLParser object to collect information about each word on this page with help of lucene.morphology api and create an index for each of them
+* Third step is saveAll collected object (list of lemmas, list of indexes, page) and update statusTime for indexing Site (you may find a description of this Entity below as well)
+* Finally, FJO create a subtask and launch.
+
+*__One more comment about indexing:__ it works in multithreading mode for each of the marked in config files sites* 
 
 ## How launch a serchengine app
+To launch it in local machine, you need to do a few simple things after downloading:
+1. Fist of all you need to create a database on localhost (the best option is a MySQL DB to do nothing changes in pom.xml etc.)
+2. Then you need a put the login information to the config file `application.yaml` to the bellow points (username, password, port number and database name:
+   ```yaml
+      spring:
+        datasource:
+          username: USERNAME
+          password: PASSWORD
+          url: jdbc:mysql://localhost:PORT_NUM/DATABASE_NAME?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true
+   ```
+3. Then you need to make a more sensitive settings for indexing page in the bellow points:
+   * userAgent - name of your copy of this search application
+   * referrer - it is a location where you want to make a request to sites for indexing from (ex. https://www.google.com, because why not)
+   * redirect - would you like to index pages with http code "3xx" (pages what was moved to another resource)
+   * sleep - how long you want to sleep after each request to the site`s page (to avoid any problem with cyber security)
+   * timeout - how long your app will wait for connecting
+   * ignoreHttpErrors - if you want to index pages with some http error (i advice to keep it true, because this app will skip pages with error pages (like "4xx" / "5xx") automatically)
+   * and __the core of this app__: sites. This option contains two parameters
+     * url - link to the root page of sites that you need to add to the app
+     * name - to have a correct naming of this site
 
+  ```yaml
+     indexing-settings:
+       userAgent: DeepSearchBot
+       referrer: http://www.google.com
+       redirect: true
+       sleep: 200
+       timeout: 10000
+       ignoreHttpErrors: true
+       sites:
+         - url: https://site.example/
+           name: Site name example
+         - url: http://second.sites.example/
+           name: Second site name axample
+         ##   this field is a list, you may add as much as you need sites
+  ```
 
 ___
 ## Model:
@@ -91,18 +138,52 @@ This is the service for using an indexation functionality. Here you can find a m
 * stopIndexing() - to stop an indexing
 * indexPage(String url) - to launch an indexing for one page **(if this site is exists in config)**
 
+```java
+    @Service
+    public interface IndexingService {
+        ResponseEntity<ResponseService> startIndexing();
+        ResponseEntity<ResponseService> stopIndexing();
+        ResponseEntity<ResponseService> indexPage(String url);
+    }
+```
+
 ### SearchService
 ![search_service](src/main/resources/searchengineReadme/search.png)
 
 This is the service for using a search functionality. Here you can find only one main method:
 * search(String query, String site, int offset, int limit) - to launch a locking for the search word by indexes
+```java
+    @Service
+    public interface SearchService {
+        ResponseEntity<ResponseService> search(String query, String siteUrl, int offset, int limit);
+   }
+```
+
 
 ### StatisticsService
 ![statistics_service](src/main/resources/searchengineReadme/statistics.png)
 
 This is the service to get actual information about application. Here you can find only one method as well:
 * getStatistics() - to collect actual information: how many sites, pages, lemmas was indexing, also about each of the sites with detail info
+```java
+   @Service
+   public interface StatisticsService {
+        ResponseEntity<ResponseService> getStatistics();
+   }
+```
+
+
 ### ResponseService
 
 This is the last service, it is using to create a correct response for each of the previous methods(success or error response)
 
+```java
+    @Value public static class ErrorResponse implements ResponseService, Result, Error {
+         public ErrorResponse(String error) {
+            this.result = false;
+            this.error = error;
+         }
+         Boolean result;
+         String error;
+    }
+```

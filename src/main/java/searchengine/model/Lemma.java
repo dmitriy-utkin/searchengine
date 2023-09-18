@@ -19,7 +19,7 @@ import javax.transaction.Transactional;
 @Table(name = "lemmas")
 @DependsOn("sites")
 @DynamicUpdate
-public class DBLemma {
+public class Lemma {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,7 +27,7 @@ public class DBLemma {
 
     @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
-    private DBSite dbSite;
+    private Site site;
 
     @Column(name = "lemma", columnDefinition = "VARCHAR(255)", nullable = false)
     private String lemma;

@@ -1,20 +1,20 @@
 package searchengine.dto.indexing;
 
 import lombok.Data;
-import searchengine.model.DBLemma;
+import searchengine.model.Lemma;
 
 @Data
-public class ExistedDbLemma implements Comparable<DBLemma>{
-    public ExistedDbLemma(DBLemma dbLemma) {
+public class ExistedLemma implements Comparable<Lemma>{
+    public ExistedLemma(Lemma dbLemma) {
         this.dbLemma = dbLemma;
         this.frequency = dbLemma.getFrequency();
     }
 
-    private DBLemma dbLemma;
+    private Lemma dbLemma;
     private int frequency;
 
     @Override
-    public int compareTo(DBLemma otherDbLemma) {
+    public int compareTo(Lemma otherDbLemma) {
         return this.dbLemma.getLemma().compareTo(otherDbLemma.getLemma());
     }
 }
