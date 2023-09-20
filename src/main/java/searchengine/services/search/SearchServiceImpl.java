@@ -63,14 +63,19 @@ public class SearchServiceImpl implements SearchService {
         List<SearchDataItem> result = new ArrayList<>();
         Collections.sort(pages);
         pages.subList(offset, endIndex).forEach(page -> result.add(SearchDataItem.builder()
-                .relevance(page.getRelRel())
-                .title(getTitle(page.getDbPage().getContent()))
-                .snippet(createSnippet(page.getDbPage().getContent(), page.getLemmas()))
-                .uri(page.getDbPage().getPath())
-                .site(page.getDbPage().getSite().getUrl())
-                .siteName(page.getDbPage().getSite().getName())
-                .build()));
-        return new PageImpl<>(result, PageRequest.of(offset, limit), pages.size());
+                                                .relevance(page.getRelRel())
+                                                .title(getTitle(page.getDbPage().getContent()))
+                                                .snippet(createSnippet(page.getDbPage().getContent(), page.getLemmas()))
+                                                .uri(page.getDbPage().getPath())
+                                                .site(page.getDbPage().getSite().getUrl())
+                                                .siteName(page.getDbPage().getSite().getName())
+                                                .build()));
+        return new PageImpl<>(result, PageRequest.of(getPageNumber(offset, limit), limit), pages.size());
+    }
+
+    private int getPageNumber(int offset, int limit) {
+        if (offset == 0) return 0;
+        return (offset / limit);
     }
 
     private List<SearchQueryResult> collectResultPages(Set<String> lemmas, String siteUrl) {
@@ -195,12 +200,14 @@ public class SearchServiceImpl implements SearchService {
         Map<String, String> equalsWords = lemmaFinder.collectNormalInitialForms(content, query);
         String text = lemmaFinder.convertHtmlToText(content).toLowerCase().trim();
         StringBuilder sb = new StringBuilder();
-        int plusAndMinusSnippetLength = searchConfig.getSnippetLength() / query.size() / 2;
+        int plusMinusLength = searchConfig.getSnippetLength() / query.size() / 2;
         int count = 0;
         for (String word : query) {
             int index = text.indexOf(equalsWords.get(word));
-            int start = index == 0 ? 0 : Math.max(text.indexOf(" ", index - plusAndMinusSnippetLength), 0);
-            int end = Math.min(text.indexOf(" ", index + plusAndMinusSnippetLength), text.length());
+            int start = index == 0 ? 0 : Math.max(text.indexOf(" ", index - plusMinusLength), 0);
+            int fromIndexForEnd = query.size() > 1 ? index + plusMinusLength
+                                                    : start + searchConfig.getSnippetLength();
+            int end = Math.min(text.indexOf(" ", fromIndexForEnd), text.length());
             sb.append(count == 0 ? "..." : "").append(text, start, index)
                     .append("<b>").append(equalsWords.get(word)).append("</b>")
                     .append(text, index + equalsWords.get(word).length(), end == -1 ? text.length() : end)

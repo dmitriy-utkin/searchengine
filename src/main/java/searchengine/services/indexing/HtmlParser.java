@@ -39,11 +39,11 @@ public class HtmlParser {
         Optional<List<Lemma>> dbLemmas = lemmaRepository.findAllBySite(site);
         final List<ExistedLemma> existedBySiteLemmas = new ArrayList<>();
         dbLemmas.ifPresent(dbLemmaList -> existedBySiteLemmas.addAll(dbLemmaList.stream()
-                .map(ExistedLemma::new).toList()));
+                                                                                .map(ExistedLemma::new).toList()));
         lemmasMap.keySet().forEach(lemma -> {
             ExistedLemma existedLemma = existedBySiteLemmas.stream()
-                    .filter(l -> l.getDbLemma().getLemma().equals(lemma))
-                    .findFirst().orElse(null);
+                                                            .filter(l -> l.getDbLemma().getLemma().equals(lemma))
+                                                            .findFirst().orElse(null);
             if (existedLemma != null) {
                 updateLemmaAndIndexesLists(updateLemmaFrequency(existedLemma.getDbLemma()), lemmasMap);
             } else {

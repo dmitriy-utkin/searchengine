@@ -54,9 +54,9 @@ public class IndexingServiceImpl implements IndexingService {
             siteRepository.findAll().forEach(dbSite -> new Thread(() -> {
                 new ForkJoinPool().invoke(
                         new SiteParseAction(jsoupConfig,
-                                siteRepository, pageRepository, lemmaRepository, lemmaFinder, indexRepository,
-                                dbSite, dbSite.getUrl() + "/",
-                                new ConcurrentHashMap<>())
+                                            siteRepository, pageRepository, lemmaRepository, lemmaFinder,
+                                            indexRepository, dbSite, dbSite.getUrl() + "/",
+                                            new ConcurrentHashMap<>())
                 );
                 updateSiteStatus(dbSite, Status.INDEXED);
             }).start());
@@ -77,8 +77,8 @@ public class IndexingServiceImpl implements IndexingService {
                 indexationIsRunning = false;
                 List<Site> sites = siteRepository.findByStatus(Status.INDEXING);
                 sites.forEach(site -> updateSiteStatus(site,
-                        Status.FAILED,
-                        errorOptionConfig.getIndexingStoppedByUserError()));
+                                    Status.FAILED,
+                                    errorOptionConfig.getIndexingStoppedByUserError()));
             } catch (Exception e) {
                 e.printStackTrace();
             }
