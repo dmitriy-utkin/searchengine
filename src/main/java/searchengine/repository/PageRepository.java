@@ -12,5 +12,5 @@ import java.util.Optional;
 @Transactional
 public interface PageRepository extends JpaRepository<Page, Integer> {
     Optional<Page> findByPathAndSite(String path, Site site);
-    Float countBySite(Site site);
+    long countBySite(Site site);
 }

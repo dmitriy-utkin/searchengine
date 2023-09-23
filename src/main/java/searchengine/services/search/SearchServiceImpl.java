@@ -15,6 +15,7 @@ import searchengine.dto.search.SearchDataItem;
 import searchengine.dto.search.SearchQueryResult;
 import searchengine.dto.search.SearchQueryObject;
 import searchengine.dto.search.SearchQueryPage;
+import searchengine.model.Lemma;
 import searchengine.model.Site;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
@@ -94,47 +95,48 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private List<SearchQueryObject> collectSortedLemmasAsSearchQueryObj(Set<String> searchWords) {
+        float totalPagesNumber = (float) pageRepository.count();
         List<SearchQueryObject> result = new ArrayList<>();
         searchWords.forEach(lemma -> {
-            float totalPagesNumber = (float) pageRepository.count();
-            Float sumFrequencyByLemma = lemmaRepository.sumFrequencyByLemma(lemma);
-            boolean isCorrectLemma = sumFrequencyByLemma != null
-                    && (sumFrequencyByLemma / totalPagesNumber * 100 < searchConfig.getMaxFrequencyInPercent());
+            Float sumFrequencyByLemma = lemmaRepository.sumFrequencyByLemma(lemma).orElse(null);
+            boolean isCorrectLemma = sumFrequencyByLemma != null && totalPagesNumber > 0
+                    && (((sumFrequencyByLemma / totalPagesNumber * 100 < searchConfig.getMaxFrequencyInPercent())
+                    || searchWords.size() <= searchConfig.getMaxQueryLengthToSkipChecking()));
             if (isCorrectLemma) result.add(createSearchQueryObject(lemma, sumFrequencyByLemma.intValue()));
         });
         return result;
     }
 
     private List<SearchQueryObject> collectSortedLemmasAsSearchQueryObj(Set<String> searchWords, Site site) {
+        float totalPagesNumber = (float) pageRepository.countBySite(site);
         List<SearchQueryObject> result = new ArrayList<>();
         searchWords.forEach(lemma -> {
-            Float totalPagesNumberBySite = pageRepository.countBySite(site);
-            Float sumFrequencyByDbSiteAndLemma = lemmaRepository.sumFrequencyBySiteAndLemma(site, lemma);
-            float lemmaTotalFrequencyInPercent = sumFrequencyByDbSiteAndLemma / totalPagesNumberBySite * 100;
-            boolean isCorrectLemma = totalPagesNumberBySite != null
-                    && sumFrequencyByDbSiteAndLemma != null
-                    && (lemmaTotalFrequencyInPercent < searchConfig.getMaxFrequencyInPercent());
-            if (isCorrectLemma) {
-                result.add(createSearchQueryObject(lemma, sumFrequencyByDbSiteAndLemma.intValue(), site));
-            }
+            Float sumFrequencyByLemma = lemmaRepository.sumFrequencyBySiteAndLemma(site, lemma).orElse(null);
+            boolean isCorrectLemma = sumFrequencyByLemma != null && totalPagesNumber > 0
+                    && (((sumFrequencyByLemma / totalPagesNumber * 100 < searchConfig.getMaxFrequencyInPercent())
+                    || searchWords.size() <= searchConfig.getMaxQueryLengthToSkipChecking()));
+            if (isCorrectLemma) result.add(createSearchQueryObject(lemma, sumFrequencyByLemma.intValue(), site));
         });
         return result;
     }
 
     private SearchQueryObject createSearchQueryObject(String lemma, int totalFrequencyByLemma, Site site) {
-        if (lemmaRepository.findBySiteAndLemma(site, lemma).isEmpty()) return null;
+        List<Lemma> lemmaList = lemmaRepository.findBySiteAndLemma(site, lemma).orElse(null);
+        if (lemmaList == null) return null;
         return SearchQueryObject.builder()
                 .lemma(lemma)
                 .totalFrequency(totalFrequencyByLemma)
-                .dbLemmaList(List.of(lemmaRepository.findBySiteAndLemma(site, lemma).get()))
+                .dbLemmaList(lemmaList)
                 .build();
     }
 
     private SearchQueryObject createSearchQueryObject(String lemma, int totalFrequencyByLemma) {
+        List<Lemma> lemmaList = lemmaRepository.findByLemma(lemma).orElse(null);
+        if (lemmaList == null) return null;
         return SearchQueryObject.builder()
                 .lemma(lemma)
                 .totalFrequency(totalFrequencyByLemma)
-                .dbLemmaList(lemmaRepository.findByLemma(lemma).get())
+                .dbLemmaList(lemmaList)
                 .build();
     }
 
@@ -198,23 +200,30 @@ public class SearchServiceImpl implements SearchService {
 
     private String createSnippet(String content, Set<String> query) {
         Map<String, String> equalsWords = lemmaFinder.collectNormalInitialForms(content, query);
-        String text = lemmaFinder.convertHtmlToText(content).toLowerCase().trim();
+        String text = lemmaFinder.convertHtmlToText(content).trim();
+        String textToLowerCase = text.toLowerCase();
         StringBuilder sb = new StringBuilder();
         int plusMinusLength = searchConfig.getSnippetLength() / query.size() / 2;
         int count = 0;
         for (String word : query) {
-            int index = text.indexOf(equalsWords.get(word));
-            int start = index == 0 ? 0 : Math.max(text.indexOf(" ", index - plusMinusLength), 0);
+            int index = textToLowerCase.indexOf(equalsWords.get(word));
+            int start = index == 0 ? 0
+                    : Math.max(textToLowerCase.indexOf(" ", index - plusMinusLength), 0);
             int fromIndexForEnd = query.size() > 1 ? index + plusMinusLength
                                                     : start + searchConfig.getSnippetLength();
-            int end = Math.min(text.indexOf(" ", fromIndexForEnd), text.length());
-            sb.append(count == 0 ? "..." : "").append(text, start, index)
-                    .append("<b>").append(equalsWords.get(word)).append("</b>")
-                    .append(text, index + equalsWords.get(word).length(), end == -1 ? text.length() : end)
-                    .append("...");
+            int end = Math.min(textToLowerCase.indexOf(" ", fromIndexForEnd), text.length());
+            try {
+                sb.append(count == 0 ? "..." : "").append(text, start, index)
+                        .append("<b>").append(equalsWords.get(word)).append("</b>")
+                        .append(text, index + equalsWords.get(word).length(), end == -1 ? text.length() : end)
+                        .append("...");
+            } catch (Exception e) {
+                e.printStackTrace();
+                sb.append(count == 0 ? "..." : "").append("<b>").append(equalsWords.get(word)).append("</b>...");
+            }
+            if (sb.length() >= searchConfig.getSnippetLength()) break;
             count++;
         }
-
         return sb.toString();
     }
 

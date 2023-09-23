@@ -14,4 +14,5 @@ public class SearchConfig {
     private int defaultOffset;
     private int defaultLimit;
     private int snippetLength;
+    private int maxQueryLengthToSkipChecking;
 }

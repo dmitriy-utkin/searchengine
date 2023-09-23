@@ -7,7 +7,7 @@ import searchengine.model.Page;
 
 @Data
 @Builder
-@EqualsAndHashCode
+@EqualsAndHashCode(exclude = {"rank"})
 public class SearchQueryPage implements Comparable<SearchQueryPage> {
     private Page dbPage;
     private int rank;

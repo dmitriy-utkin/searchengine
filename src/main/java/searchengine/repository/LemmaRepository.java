@@ -14,12 +14,12 @@ import java.util.Optional;
 @Repository
 @Transactional
 public interface LemmaRepository extends JpaRepository<Lemma, Integer> {
-    Optional<Lemma> findBySiteAndLemma(Site site, String lemma);
+    Optional<List<Lemma>> findBySiteAndLemma(Site site, String lemma);
     Optional<List<Lemma>> findByLemma(String lemma);
     Optional<List<Lemma>> findAllBySite(Site site);
     @Query("SELECT SUM(l.frequency) FROM Lemma l WHERE l.lemma = :lemma")
-    Float sumFrequencyByLemma(@Param("lemma") String lemma);
+    Optional<Float> sumFrequencyByLemma(@Param("lemma") String lemma);
     @Query("SELECT SUM(l.frequency) FROM Lemma l WHERE l.site = :site AND l.lemma = :lemma")
-    Float sumFrequencyBySiteAndLemma(@Param("site") Site site, @Param("lemma") String lemma);
+    Optional<Float> sumFrequencyBySiteAndLemma(@Param("site") Site site, @Param("lemma") String lemma);
     long countBySite(Site site);
 }
