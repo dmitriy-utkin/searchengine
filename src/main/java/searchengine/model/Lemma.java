@@ -11,10 +11,10 @@ import javax.transaction.Transactional;
 @Getter
 @Setter
 @Builder
-@EqualsAndHashCode
+@EqualsAndHashCode(of = {"id", "lemma"})
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"dbSite"})
+@ToString(exclude = {"site"})
 @Transactional
 @Table(name = "lemmas")
 @DependsOn("sites")

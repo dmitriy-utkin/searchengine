@@ -13,8 +13,8 @@ import javax.transaction.Transactional;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"dbSite", "code", "content"})
-@EqualsAndHashCode(exclude = "content")
+@ToString(exclude = {"site", "code", "content"})
+@EqualsAndHashCode(of = {"id", "path"})
 @Transactional
 @Table(name = "pages", indexes = {@Index(name = "path_site_index", columnList = "site_id, path", unique = true)})
 @DependsOn("sites")

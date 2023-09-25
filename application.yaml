@@ -31,9 +31,9 @@ search-settings:
 error-settings:
   startIndexingError: Индексация уже запущена
   stopIndexingError: Индексация не запущена
-  indexingStoppedByUserError: Индексация остановлена пользователем
-  indexPageSiteIsOutOfTheListError: Данная страница находится за пределами сайтов, указанных в конфигурационном файле
-  indexPageSiteIsInIndexingProcessError: Данный сайт находится в процессе индексации
+  indexingInterruptedError: Индексация остановлена пользователем
+  siteOutOfConfigError: Данная страница находится за пределами сайтов, указанных в конфигурационном файле
+  siteIsIndexingError: Данный сайт находится в процессе индексации
   mainPageUnavailableError: Главная страница недоступна
   emptyQuerySearchError: Задан пустой поисковый запрос
   badRequestError: Неправильный запрос

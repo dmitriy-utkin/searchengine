@@ -1,4 +1,4 @@
-package searchengine.services.indexing;
+package searchengine.services.indexing.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.morphology.LuceneMorphology;

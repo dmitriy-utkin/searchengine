@@ -5,7 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import searchengine.model.Site;
 import searchengine.model.Status;
-import searchengine.services.indexing.IndexingServiceImpl;
+import searchengine.services.indexing.impl.IndexingServiceImpl;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 

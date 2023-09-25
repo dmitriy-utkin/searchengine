@@ -1,5 +1,6 @@
 package searchengine.repository;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,6 @@ import java.util.Optional;
 public interface IndexRepository extends JpaRepository<Index, Integer> {
     void deleteByPage(Page page);
     Optional<List<Index>> findByPage(Page page);
+    @EntityGraph(value = "indexWithPageAndSite")
     List<Index> findByLemmaIn(List<Lemma> lemmas);
-
 }

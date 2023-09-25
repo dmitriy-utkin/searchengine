@@ -2,6 +2,7 @@ package searchengine.model;
 
 import lombok.*;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import javax.persistence.*;
 import javax.transaction.Transactional;
@@ -10,13 +11,17 @@ import javax.transaction.Transactional;
 @Getter
 @Setter
 @Builder
-@EqualsAndHashCode
+@EqualsAndHashCode(of = {"id"})
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"dbPage", "dbLemma"})
+@ToString(exclude = {"page", "lemma"})
 @Transactional
 @Table(name = "indexes", indexes = {@javax.persistence.Index(name = "lemma_index", columnList = "lemma_id")})
 @DependsOn({"pages", "lemmas"})
+@NamedEntityGraph(name = "indexWithPageAndSite", attributeNodes = {@NamedAttributeNode(value = "page",
+                                                    subgraph = "pagesWithSites")},
+                                                    subgraphs = {@NamedSubgraph(name = "pagesWithSites",
+                                                            attributeNodes = @NamedAttributeNode(value = "site"))})
 public class Index {
 
     @Id

@@ -11,10 +11,10 @@ import java.util.Date;
 @Getter
 @Setter
 @Builder
-@EqualsAndHashCode
+@EqualsAndHashCode(of ={"id", "url"})
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"status", "statusTime", "lastError"})
+@ToString(exclude = {"statusTime", "lastError"})
 @Transactional
 @Table(name = "sites")
 @DynamicUpdate

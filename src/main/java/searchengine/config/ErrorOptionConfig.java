@@ -12,9 +12,9 @@ import org.springframework.stereotype.Component;
 public class ErrorOptionConfig {
     private String startIndexingError;
     private String stopIndexingError;
-    private String indexingStoppedByUserError;
-    private String indexPageSiteIsOutOfTheListError;
-    private String indexPageSiteIsInIndexingProcessError;
+    private String indexingInterruptedError;
+    private String siteOutOfConfigError;
+    private String siteIsIndexingError;
     private String mainPageUnavailableError;
     private String emptyQuerySearchError;
     private String badRequestError;

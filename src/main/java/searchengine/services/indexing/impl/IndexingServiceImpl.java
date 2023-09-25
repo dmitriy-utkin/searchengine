@@ -1,10 +1,7 @@
-package searchengine.services.indexing;
+package searchengine.services.indexing.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Connection;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -16,8 +13,9 @@ import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
+import searchengine.services.indexing.IndexingService;
 import searchengine.services.response.ResponseService;
-import searchengine.services.response.ResponseServiceImpl;
+import searchengine.services.response.impl.ResponseServiceImpl;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,25 +37,18 @@ public class IndexingServiceImpl implements IndexingService {
 
     public static boolean indexationIsRunning = false;
 
-    //TODO: поработать над механизмом выставления "ошибок", к примеру в случае, если главная страница недоступна
-    //TODO: доработать механизм выставления статуса "INDEXED" -> сейчас в некоторых сайтах не выставляется статус
-
     @Override
     public ResponseEntity<ResponseService> startIndexing(){
         try {
-            if (siteRepository.existsByStatus(Status.INDEXING))
-                return new ResponseEntity<>(new ResponseServiceImpl
+            if (siteRepository.existsByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl
                         .ErrorResponse(errorOptionConfig.getStartIndexingError()), HttpStatus.METHOD_NOT_ALLOWED);
             indexationIsRunning = true;
             clearDataBase();
             sitesList.getSites().forEach(site -> siteRepository.save(createSiteEntry(site)));
             siteRepository.findAll().forEach(dbSite -> new Thread(() -> {
-                new ForkJoinPool().invoke(
-                        new SiteParseAction(jsoupConfig,
-                                            siteRepository, pageRepository, lemmaRepository, lemmaFinder,
-                                            indexRepository, dbSite, dbSite.getUrl() + "/",
-                                            new ConcurrentHashMap<>())
-                );
+                new ForkJoinPool().invoke(new SiteParseAction(jsoupConfig,siteRepository, pageRepository,
+                        lemmaRepository, lemmaFinder, indexRepository, dbSite, dbSite.getUrl() + "/",
+                        new ConcurrentHashMap<>()));
                 updateSiteStatus(dbSite, Status.INDEXED);
             }).start());
             return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
@@ -70,18 +61,12 @@ public class IndexingServiceImpl implements IndexingService {
     @Override
     public ResponseEntity<ResponseService> stopIndexing() {
         try {
-            if (!siteRepository.existsByStatus(Status.INDEXING))
-                return new ResponseEntity<>(new ResponseServiceImpl
+            if (!siteRepository.existsByStatus(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl
                         .ErrorResponse(errorOptionConfig.getStopIndexingError()), HttpStatus.METHOD_NOT_ALLOWED);
-            try {
-                indexationIsRunning = false;
-                List<Site> sites = siteRepository.findByStatus(Status.INDEXING);
-                sites.forEach(site -> updateSiteStatus(site,
-                                    Status.FAILED,
-                                    errorOptionConfig.getIndexingStoppedByUserError()));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            indexationIsRunning = false;
+            List<Site> sites = siteRepository.findByStatus(Status.INDEXING);
+            sites.forEach(site -> updateSiteStatus(site,Status.FAILED,
+                                errorOptionConfig.getIndexingInterruptedError()));
             return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
         } catch (Exception exception) {
             log.error("Error in method \".stopIndexing()\":" + exception.getMessage());
@@ -94,27 +79,13 @@ public class IndexingServiceImpl implements IndexingService {
     public ResponseEntity<ResponseService> indexPage(String newUrl) {
         try {
             String preparedUrl = newUrl.toLowerCase().trim();
-            if (sitesList.getSites().stream().map(searchengine.config.Site::getUrl).noneMatch(preparedUrl::startsWith))
-                return new ResponseEntity<>(new ResponseServiceImpl
-                        .ErrorResponse(errorOptionConfig.getIndexPageSiteIsOutOfTheListError()), HttpStatus.NOT_FOUND);
-            Site dbSite = siteRepository.findAll().stream()
-                    .filter(site -> preparedUrl.startsWith(site.getUrl())).toList().get(0);
-            if (dbSite.getStatus().equals(Status.INDEXING))
-                return new ResponseEntity<>(new ResponseServiceImpl
-                        .ErrorResponse(errorOptionConfig.getIndexPageSiteIsInIndexingProcessError()),
-                        HttpStatus.METHOD_NOT_ALLOWED);
-            new Thread(() -> {
-                indexationIsRunning = true;
-                Status initialStatus = dbSite.getStatus();
-                updateSiteStatus(dbSite, Status.INDEXING);
-                clearDataBaseByOnePage(pageRepository
-                        .findByPathAndSite(preparedUrl.replace(dbSite.getUrl(), ""), dbSite));
-                Page dbPage = pageRepository.save(createNewPageEntry(preparedUrl, dbSite));
-                updateDataBaseForOneIndexedPage(dbSite, dbPage,
-                        new HtmlParser(dbSite, dbPage, lemmaFinder, lemmaRepository));
-                updateSiteStatus(dbSite, initialStatus);
-                indexationIsRunning = false;
-            }).start();
+            Site dbSite = siteRepository.findAll().stream().filter(site -> preparedUrl.startsWith(site.getUrl()))
+                    .findFirst().orElse(null);
+            if (dbSite == null) return new ResponseEntity<>(new ResponseServiceImpl
+                        .ErrorResponse(errorOptionConfig.getSiteOutOfConfigError()), HttpStatus.NOT_FOUND);
+            if (dbSite.getStatus().equals(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl
+                        .ErrorResponse(errorOptionConfig.getSiteIsIndexingError()),HttpStatus.METHOD_NOT_ALLOWED);
+            new Thread(() -> updateDataBaseByOnePage(preparedUrl, dbSite)).start();
             return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
         } catch (Exception exception) {
             log.error("Error in method \".indexPage(String newUrl)\":" + exception.getMessage());
@@ -152,10 +123,8 @@ public class IndexingServiceImpl implements IndexingService {
         site.setLastError(lastError);
         site.setStatusTime(new Date());
         siteRepository.saveAndFlush(site);
-        log.info("Site status for \""
-                + site.getUrl() + "\" was changed to \""
-                + newStatus.toString() + "\" with last error \""
-                + lastError + "\".");
+        log.info("Site status for \""+ site.getUrl() + "\" was changed to \""
+                + newStatus.toString() + "\" with last error \"" + lastError + "\".");
         if (siteRepository.existsByStatus(Status.INDEXING)) indexationIsRunning = false;
 
     }
@@ -167,56 +136,35 @@ public class IndexingServiceImpl implements IndexingService {
         siteRepository.deleteAllInBatch(); log.info("Sites was deleted.");
     }
 
-    private Page createNewPageEntry(String uri, Site site) {
-        try {
-            Connection.Response response = Jsoup.connect(uri)
-                    .userAgent(jsoupConfig.getUserAgent())
-                    .referrer(jsoupConfig.getReferrer())
-                    .timeout(jsoupConfig.getTimeout())
-                    .ignoreHttpErrors(true)
-                    .followRedirects(jsoupConfig.isRedirect())
-                    .execute();
-            Document doc = response.parse();
-            return Page.builder()
-                    .path(uri.replace(site.getUrl(), ""))
-                    .site(site)
-                    .code(response.statusCode())
-                    .content(doc.outerHtml())
-                    .build();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Page.builder()
-                    .path(uri.replace(site.getUrl(), ""))
-                    .site(site)
-                    .code(404)
-                    .content("")
-                    .build();
-        }
+    private void updateDataBaseByOnePage(String url, Site site) {
+        indexationIsRunning = true;
+        Status initialStatus = site.getStatus();
+        updateSiteStatus(site, Status.INDEXING);
+        Page oldPage = pageRepository.findByPathAndSite(url.replace(site.getUrl(), ""),site)
+                .orElse(null);
+        clearDataBaseByOnePage(oldPage);
+        PageInfoCreator creator = new PageInfoCreator(site, url, jsoupConfig,lemmaFinder, lemmaRepository);
+        pageRepository.save(creator.getPage());
+        if (creator.getLemmas() != null) lemmaRepository.saveAllAndFlush(creator.getLemmas());
+        if (creator.getIndexes() != null) indexRepository.saveAllAndFlush(creator.getIndexes());
+        updateSiteStatus(site, initialStatus);
+        siteRepository.save(site);
+        indexationIsRunning = false;
     }
 
-    private void clearDataBaseByOnePage(Optional<Page> optionalDBPage) {
+    private void clearDataBaseByOnePage(Page page) {
         try {
-            if (optionalDBPage.isEmpty()) return;
-            List<Lemma> lemmas = indexRepository.findByPage(optionalDBPage.get()).get().stream().map(dbIndex -> {
+            if (page == null) return;
+            Optional<List<Index>> lemmaList = indexRepository.findByPage(page);
+            lemmaList.ifPresent(indexes -> lemmaRepository.saveAllAndFlush(indexes.stream().map(dbIndex -> {
                 Lemma dbLemma = dbIndex.getLemma();
                 dbLemma.setFrequency(dbLemma.getFrequency() - 1);
                 return dbLemma;
-            }).toList();
-            lemmaRepository.saveAll(lemmas);
-            indexRepository.deleteByPage(optionalDBPage.get());
-            pageRepository.deleteById(optionalDBPage.get().getId());
+            }).toList()));
+            indexRepository.deleteByPage(page);
+            pageRepository.deleteById(page.getId());
         } catch (Exception e) {
             log.error("Error in method clearDataBaseByOnePage(Optional<DBPage> optionalDBPage): " + e.getMessage());
         }
-
     }
-
-    private void updateDataBaseForOneIndexedPage(Site site, Page page, HtmlParser htmlParse) {
-        pageRepository.save(page);
-        if (htmlParse.getLemmas() != null) lemmaRepository.saveAllAndFlush(htmlParse.getLemmas());
-        if (htmlParse.getIndexes() != null) indexRepository.saveAllAndFlush(htmlParse.getIndexes());
-        site.setStatusTime(new Date());
-        siteRepository.save(site);
-    }
-
 }

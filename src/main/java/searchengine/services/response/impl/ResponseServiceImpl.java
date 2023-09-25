@@ -1,4 +1,4 @@
-package searchengine.services.response;
+package searchengine.services.response.impl;
 
 import com.sun.istack.NotNull;
 import jdk.jfr.BooleanFlag;
@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import searchengine.dto.search.SearchDataItem;
 import searchengine.dto.statistics.StatisticsData;
+import searchengine.services.response.ResponseService;
 
 import java.util.List;
 
