@@ -1,4 +1,4 @@
-package searchengine.model;
+package searchengine.model.sql;
 
 import lombok.*;
 import org.springframework.context.annotation.DependsOn;

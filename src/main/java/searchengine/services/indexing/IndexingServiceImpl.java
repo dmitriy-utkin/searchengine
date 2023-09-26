@@ -1,4 +1,4 @@
-package searchengine.services.indexing.impl;
+package searchengine.services.indexing;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -7,15 +7,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import searchengine.config.ErrorOptionConfig;
 import searchengine.config.JsoupConfig;
-import searchengine.config.SitesList;
-import searchengine.model.*;
-import searchengine.repository.IndexRepository;
-import searchengine.repository.LemmaRepository;
-import searchengine.repository.PageRepository;
-import searchengine.repository.SiteRepository;
-import searchengine.services.indexing.IndexingService;
+import searchengine.config.SiteConfig;
+import searchengine.config.SitesListConfig;
+import searchengine.model.sql.*;
+import searchengine.repository.sql.IndexRepository;
+import searchengine.repository.sql.LemmaRepository;
+import searchengine.repository.sql.PageRepository;
+import searchengine.repository.sql.SiteRepository;
+import searchengine.services.indexing.indexingTools.LemmaFinder;
+import searchengine.services.indexing.indexingTools.PageInfoCreator;
+import searchengine.services.indexing.indexingTools.SiteParseAction;
 import searchengine.services.response.ResponseService;
-import searchengine.services.response.impl.ResponseServiceImpl;
+import searchengine.services.response.ResponseServiceImpl;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,7 +34,7 @@ public class IndexingServiceImpl implements IndexingService {
     private final LemmaRepository lemmaRepository;
     private final IndexRepository indexRepository;
     private final LemmaFinder lemmaFinder;
-    private final SitesList sitesList;
+    private final SitesListConfig sitesList;
     private final JsoupConfig jsoupConfig;
     private final ErrorOptionConfig errorOptionConfig;
 
@@ -51,8 +54,9 @@ public class IndexingServiceImpl implements IndexingService {
                         new ConcurrentHashMap<>()));
                 updateSiteStatus(dbSite, Status.INDEXED);
             }).start());
-            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
-        } catch (Exception exception) {
+            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponse(), HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(new ResponseServiceImpl
                     .ErrorResponse(errorOptionConfig.getInternalServerError()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -67,9 +71,9 @@ public class IndexingServiceImpl implements IndexingService {
             List<Site> sites = siteRepository.findByStatus(Status.INDEXING);
             sites.forEach(site -> updateSiteStatus(site,Status.FAILED,
                                 errorOptionConfig.getIndexingInterruptedError()));
-            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
-        } catch (Exception exception) {
-            log.error("Error in method \".stopIndexing()\":" + exception.getMessage());
+            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponse(), HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(new ResponseServiceImpl
                     .ErrorResponse(errorOptionConfig.getInternalServerError()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -86,15 +90,15 @@ public class IndexingServiceImpl implements IndexingService {
             if (dbSite.getStatus().equals(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl
                         .ErrorResponse(errorOptionConfig.getSiteIsIndexingError()),HttpStatus.METHOD_NOT_ALLOWED);
             new Thread(() -> updateDataBaseByOnePage(preparedUrl, dbSite)).start();
-            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponseService(), HttpStatus.OK);
-        } catch (Exception exception) {
-            log.error("Error in method \".indexPage(String newUrl)\":" + exception.getMessage());
+            return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponse(), HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(new ResponseServiceImpl
                     .ErrorResponse(errorOptionConfig.getInternalServerError()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    private Site createSiteEntry(searchengine.config.Site site) {
+    private Site createSiteEntry(SiteConfig site) {
         return Site.builder()
                 .status(Status.INDEXING)
                 .url(prepareSiteUrl(site.getUrl()))

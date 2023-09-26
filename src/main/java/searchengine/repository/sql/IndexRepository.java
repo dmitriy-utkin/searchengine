@@ -1,12 +1,12 @@
-package searchengine.repository;
+package searchengine.repository.sql;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-import searchengine.model.Index;
-import searchengine.model.Lemma;
-import searchengine.model.Page;
+import searchengine.model.sql.Index;
+import searchengine.model.sql.Lemma;
+import searchengine.model.sql.Page;
 
 import java.util.List;
 import java.util.Optional;

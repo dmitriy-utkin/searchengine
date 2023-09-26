@@ -3,9 +3,10 @@ package searchengine.services;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import searchengine.model.Site;
-import searchengine.model.Status;
-import searchengine.services.indexing.impl.IndexingServiceImpl;
+import searchengine.config.SiteConfig;
+import searchengine.model.sql.Site;
+import searchengine.model.sql.Status;
+import searchengine.services.indexing.IndexingServiceImpl;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
@@ -13,12 +14,12 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 class IndexingServiceImplTest {
 
     IndexingServiceImpl indexingServiceImpl;
-    searchengine.config.Site site;
+    SiteConfig site;
 
     @BeforeEach
     void beforeEach() {
         indexingServiceImpl = new IndexingServiceImpl();
-        site = new searchengine.config.Site();
+        site = new SiteConfig();
         site.setName("Test");
         site.setUrl("http://testPage.ru");
     }

@@ -1,4 +1,4 @@
-package searchengine.services.search.impl;
+package searchengine.services.search;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,17 +15,18 @@ import searchengine.dto.search.SearchDataItem;
 import searchengine.dto.search.SearchQueryResult;
 import searchengine.dto.search.SearchQueryObject;
 import searchengine.dto.search.SearchQueryPage;
-import searchengine.model.Index;
-import searchengine.model.Lemma;
-import searchengine.model.Site;
-import searchengine.repository.IndexRepository;
-import searchengine.repository.LemmaRepository;
-import searchengine.repository.PageRepository;
-import searchengine.repository.SiteRepository;
-import searchengine.services.indexing.impl.LemmaFinder;
+import searchengine.model.nosql.CacheSearch;
+import searchengine.model.sql.Index;
+import searchengine.model.sql.Lemma;
+import searchengine.model.sql.Site;
+import searchengine.repository.sql.IndexRepository;
+import searchengine.repository.sql.LemmaRepository;
+import searchengine.repository.sql.PageRepository;
+import searchengine.repository.sql.SiteRepository;
+import searchengine.services.cashSearch.CacheSearchService;
+import searchengine.services.indexing.indexingTools.LemmaFinder;
 import searchengine.services.response.ResponseService;
-import searchengine.services.response.impl.ResponseServiceImpl;
-import searchengine.services.search.SearchService;
+import searchengine.services.response.ResponseServiceImpl;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -42,16 +43,28 @@ public class SearchServiceImpl implements SearchService {
     private final LemmaFinder lemmaFinder;
     private final SearchConfig searchConfig;
     private final ErrorOptionConfig errorOptionConfig;
+    private final CacheSearchService cacheSearchService;
+
+    //TODO: проработать как сделать конфигурацию так, чтобы бин на CacheSearchService не создавался,
+    // если searchConfig.isWithCache() = false
+
+    //TODO: проработать функционал, чтобы mongoDb создавала индекс на удаление cache
+    // через какое-то время (spring.data.mongodb.ttl)
 
     @Override
     public ResponseEntity<ResponseService> search(String query, String site, int offset, int limit) {
         try {
             if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl
                     .ErrorResponse(errorOptionConfig.getEmptyQuerySearchError()), HttpStatus.BAD_REQUEST);
+            if (searchConfig.isWithCache() && cacheSearchService.existsByQueryAndSite(query, site)) {
+                CacheSearch cacheSearch = cacheSearchService.getByQueryAndSite(query, site);
+                Page<SearchDataItem> cachedResult = getCachedSearchResult(cacheSearch, offset, limit);
+                return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponse(cachedResult), HttpStatus.OK);
+            }
             Page<SearchDataItem> items = collectSearchDataItems(query, site, offset, limit);
-            return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponseService(items), HttpStatus.OK);
-        } catch (Exception exception) {
-            exception.printStackTrace();
+            return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponse(items), HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(new ResponseServiceImpl
                     .ErrorResponse(errorOptionConfig.getInternalServerError()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -59,12 +72,34 @@ public class SearchServiceImpl implements SearchService {
 
     private Page<SearchDataItem> collectSearchDataItems(String query, String site, int offset, int limit) {
         Set<String> lemmas = lemmaFinder.collectLemmas(query).keySet();
-        List<SearchQueryResult> pages = collectResultPages(lemmas, site);
-        if (pages.isEmpty()) return new PageImpl<>(new ArrayList<>());
-        int endIndex = Math.min(offset + limit, pages.size());
+        List<SearchQueryResult> queryResultList = collectResultPages(lemmas, site);
+        if (queryResultList.isEmpty()) return new PageImpl<>(new ArrayList<>());
+        int endIndex = Math.min(offset + limit, queryResultList.size());
         List<SearchDataItem> result = new ArrayList<>();
-        pages.subList(offset, endIndex).forEach(page -> result.add(createSearchDataItem(page)));
-        return new PageImpl<>(result, PageRequest.of(getPageNumber(offset, limit), limit), pages.size());
+        queryResultList.subList(offset, endIndex).forEach(resultItem -> result.add(createSearchDataItem(resultItem)));
+        new Thread(() -> saveToCacheAllSearchDataItems(query, site, queryResultList)).start();
+        return getResultPage(result, offset, limit, queryResultList.size());
+    }
+
+    private Page<SearchDataItem> getResultPage(List<SearchDataItem> result, int offset, int limit, int size) {
+        return new PageImpl<>(result, PageRequest.of(getPageNumber(offset, limit), limit), size);
+    }
+
+    private int getPageNumber(int offset, int limit) {
+        return (offset / limit);
+    }
+
+    private Page<SearchDataItem> getCachedSearchResult(CacheSearch cacheSearch, int offset, int limit) {
+        List<SearchDataItem> items = cacheSearch.getSearchDataItems();
+        int endIndex = Math.min(offset + limit, items.size());
+        return getResultPage(items.subList(offset, endIndex), offset, limit, items.size());
+    }
+
+    private void saveToCacheAllSearchDataItems(String query, String site, List<SearchQueryResult> queryResultList) {
+        if (searchConfig.isWithCache()) {
+            List<SearchDataItem> result = queryResultList.stream().map(this::createSearchDataItem).toList();
+            cacheSearchService.createCacheByQuery(query, site, result);
+        }
     }
 
     private SearchDataItem createSearchDataItem(SearchQueryResult page) {
@@ -72,10 +107,6 @@ public class SearchServiceImpl implements SearchService {
                 .snippet(createSnippet(page.getDbPage().getContent(), page.getLemmas()))
                 .uri(page.getDbPage().getPath()).site(page.getDbPage().getSite().getUrl())
                 .siteName(page.getDbPage().getSite().getName()).build();
-    }
-
-    private int getPageNumber(int offset, int limit) {
-        return (offset / limit);
     }
 
     private List<SearchQueryResult> collectResultPages(Set<String> lemmas, String siteUrl) {

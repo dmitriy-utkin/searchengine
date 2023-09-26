@@ -1,7 +1,7 @@
 package searchengine.dto.indexing;
 
 import lombok.Data;
-import searchengine.model.Lemma;
+import searchengine.model.sql.Lemma;
 
 @Data
 public class ExistedLemma implements Comparable<Lemma>{

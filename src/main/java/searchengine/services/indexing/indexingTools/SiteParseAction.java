@@ -1,13 +1,17 @@
-package searchengine.services.indexing.impl;
+package searchengine.services.indexing.indexingTools;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import searchengine.config.JsoupConfig;
-import searchengine.model.*;
-import searchengine.repository.IndexRepository;
-import searchengine.repository.LemmaRepository;
-import searchengine.repository.PageRepository;
-import searchengine.repository.SiteRepository;
+import searchengine.model.sql.Index;
+import searchengine.model.sql.Lemma;
+import searchengine.model.sql.Page;
+import searchengine.model.sql.Site;
+import searchengine.repository.sql.IndexRepository;
+import searchengine.repository.sql.LemmaRepository;
+import searchengine.repository.sql.PageRepository;
+import searchengine.repository.sql.SiteRepository;
+import searchengine.services.indexing.IndexingServiceImpl;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

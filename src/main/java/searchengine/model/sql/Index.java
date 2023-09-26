@@ -1,8 +1,7 @@
-package searchengine.model;
+package searchengine.model.sql;
 
 import lombok.*;
 import org.springframework.context.annotation.DependsOn;
-import org.springframework.data.jpa.repository.EntityGraph;
 
 import javax.persistence.*;
 import javax.transaction.Transactional;

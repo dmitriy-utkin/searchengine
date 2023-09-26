@@ -2,8 +2,8 @@ package searchengine.dto.search;
 
 import lombok.Builder;
 import lombok.Data;
-import searchengine.model.Index;
-import searchengine.model.Lemma;
+import searchengine.model.sql.Index;
+import searchengine.model.sql.Lemma;
 
 import java.util.List;
 

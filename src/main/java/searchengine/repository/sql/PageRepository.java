@@ -1,10 +1,10 @@
-package searchengine.repository;
+package searchengine.repository.sql;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-import searchengine.model.Page;
-import searchengine.model.Site;
+import searchengine.model.sql.Page;
+import searchengine.model.sql.Site;
 
 import java.util.Optional;
 
