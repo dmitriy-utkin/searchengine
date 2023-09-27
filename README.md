@@ -15,6 +15,27 @@ Here you can find a search engine module, it is working with prepared root sites
 
 You can use the backend part like a search module for any website.
 
+### Navigation:
+1. [How does it work? SEARCH](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#how-does-it-work-search)
+    1. [What is the "search index"?](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#what-is-the-search-index)
+    2. [What is the "normal form"?](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#what-is-the-normal-form)
+    3. [How works a search by the requested words](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#how-works-a-search-by-the-requested-words)
+    4. [Search configuration](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#search-configuration)
+2. [How does it work? INDEXING](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#how-does-it-work-indexing)
+3. [How launch a serchengine app](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#how-launch-a-serchengine-app)
+4. [Now with cached search results](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#now-with-cached-search-results)
+    1. [How does it work?](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#how-does-it-work)
+    2. [Cache document view in NoSQL db](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#cache-document-view-in-nosql-db)
+5. [Model](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#model)
+   1. [Site](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#site)
+   2. [Page](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#page)
+   3. [Lemma](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#lemma)
+   4. [Index](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#index)
+6. [Services](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#services)
+   1. [Indexing](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#indexingservice)
+   2. [Search](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#searchservice)
+   3. [Statistics](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#statisticsservice) 
+
 ![searchengine_preview](src/main/resources/searchengineReadme/searchengine_preview.gif)
 ___
 
