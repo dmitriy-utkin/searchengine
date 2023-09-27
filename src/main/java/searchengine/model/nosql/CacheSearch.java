@@ -3,7 +3,6 @@ package searchengine.model.nosql;
 import lombok.Builder;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import searchengine.dto.search.SearchDataItem;
 
@@ -19,14 +18,11 @@ public class CacheSearch {
 
     @Id
     private String searchResultId;
-    private int numberOfResult;
+    private int numberOfResults;
     private List<SearchDataItem> searchDataItems;
-
-    @Indexed(name = "createdAtIndex", expireAfter = "${spring.data.mongodb.ttl}")
     private Date createdAt;
 
-    public void populateCreatedAt() {
+    public void recordCreatedAt() {
         this.createdAt = Date.from(Instant.now());
     }
-
 }

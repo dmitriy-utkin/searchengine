@@ -45,12 +45,6 @@ public class SearchServiceImpl implements SearchService {
     private final ErrorOptionConfig errorOptionConfig;
     private final CacheSearchService cacheSearchService;
 
-    //TODO: проработать как сделать конфигурацию так, чтобы бин на CacheSearchService не создавался,
-    // если searchConfig.isWithCache() = false
-
-    //TODO: проработать функционал, чтобы mongoDb создавала индекс на удаление cache
-    // через какое-то время (spring.data.mongodb.ttl)
-
     @Override
     public ResponseEntity<ResponseService> search(String query, String site, int offset, int limit) {
         try {

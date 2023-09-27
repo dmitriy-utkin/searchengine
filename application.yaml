@@ -1,9 +1,5 @@
 server:
   port: 8080
-#  error:
-#    path: /error-handler
-#    whitelabel:
-#      enabled: false
 
 spring:
   datasource:
@@ -13,9 +9,10 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb://localhost:27017/search_engine
+      # (example) mongodb://USER:PASSWORD@localhost:27017/DATA_BASE_NAME
+      uri: mongodb://root:testTest@localhost:27017/search_engine
       name: search_engine
-      ttl: 60s # <- X.s/m/d
+      time-out: 5000
 
   jpa:
     properties:
@@ -33,7 +30,8 @@ search-settings:
   defaultOffset: 0
   defaultLimit: 20
   snippetLength: 230
-  withCache: false
+  withCache: true
+  cacheLongTtl: 60 # <- in seconds // if you change a ttl setting, drop collection first (db.search_results.drop())
 
 error-settings:
   startIndexingError: Индексация уже запущена

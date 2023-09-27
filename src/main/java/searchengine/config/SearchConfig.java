@@ -16,4 +16,5 @@ public class SearchConfig {
     private int snippetLength;
     private int maxQueryLengthToSkipChecking;
     protected boolean withCache;
+    private long cacheLongTtl;
 }

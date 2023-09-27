@@ -5,6 +5,8 @@ ___
 ![Static Badge](https://img.shields.io/badge/Java-17-blue)
 ![Static Badge](https://img.shields.io/badge/Spring_Boot-2.7.1-green)
 ![Static Badge](https://img.shields.io/badge/Searchengine-application-orange)
+![Static Badge](https://img.shields.io/badge/Search%20result%20cache%20via-MongoDB-red)
+
 ---
 
 Hey there :wave:
@@ -44,7 +46,27 @@ The "normal form" is a base form of each word. I used a lucene.morphology api ([
 3. Then apps filters of the pages by SearchQueryObject (with sorting by totalFrequency from low to high) for the presence of pages in the previous object
 4. Finally, apps make a SearchQueryResult for the page with existed searched word and sort it by relative relevance. Relative relevance building by formula `"abs/maxAbs" - by list of QueryResuls`
 
+### Search configuration
+
+Here you may find a few main settings:
+* `maxQueryLengthToSkipChecking` - how many words in search query you want to process? If you search query less than this one or equals, application will skip a check by `maxFrequencyInPercent` based on total frequency by word divide total pages by site or without site usage
+* `maxFrequencyInPercent` - if your search query size more than maxQueryLengthToSkipChecking, application will use words with total frequency by word divide total pages < `maxFrequencyInPercent`
+* `withCache` - do you want to use a cache for your search results? A little more about it in the block `"Now with cached search results"`
+* `cacheLongTtl` - how long your cache will be alive
+```yaml
+search-settings:
+  maxQueryLengthToSkipChecking: 2
+  maxFrequencyInPercent: 50
+  defaultOffset: 0
+  defaultLimit: 20
+  snippetLength: 230
+  withCache: true
+  cacheLongTtl: 60
+```
+
 ## How does it work? _INDEXING_
+
+![indexing_preview](src/main/resources/searchengineReadme/indexing_preview.gif)
 
 To be able to search some words on page, you should index it. This app can make an indexing from the root page of any sites to the all child links in multithreading mode with help of the following tools:
 * ForkJoin object (FJO) `extends RecursiveAction`, where all the magic happens. This obj make a checking this link and collect all the date about page (in accordance to the Page doc, you may find it bellow)
@@ -91,6 +113,48 @@ To launch it in local machine, you need to do a few simple things after download
            name: Second site name axample
          ##   this field is a list, you may add as much as you need sites
   ```
+
+## Now with cached search results
+
+![cache_preview](src/main/resources/searchengineReadme/сache_preview.gif)
+___
+### How does it work?
+To create a cache for search result pages was used a MongoDB via Spring Boot. The main configuration options are below:
+* search_settings.withCache - to select a search work option (true - with cache, false - without)
+* cacheLongTtl - time to live for cache in db, default value is 60 sec
+
+```yaml
+search-settings:
+  maxQueryLengthToSkipChecking: 2
+  maxFrequencyInPercent: 50
+  defaultOffset: 0
+  defaultLimit: 20
+  snippetLength: 230
+  withCache: true #  <- use true if ypu want to use a cache with mongoDB 
+  cacheLongTtl: 60 # <- in seconds // if you want to change a ttl settings, please drop collection first
+```
+
+* uri - is a database link on your mongo local server
+* name - is a name of created database
+
+![Static Badge](https://img.shields.io/badge/PAY-ATTENTION_%231-red)
+
+__YOU SHOULD HAVE A USER IN THIS DB (OR USE A DEFAULT ADMIN USER/ROLE), to get an addition info, please visit a MongoDB documentation site__
+
+![Static Badge](https://img.shields.io/badge/PAY-ATTENTION_%232-red)
+
+__application can work without cache, but it will be waiting for 30 sec for MongoTemplate if you do not connect a MongoDB server, but keep a {"search_settings.withCache":"true"}__
+
+```yaml
+  data:
+    mongodb:
+      # (example) user: root; password: testTest; database: search_engine (if you want use
+      uri: mongodb://root:testTest@localhost:27017/search_engine
+      name: search_engine
+```
+
+### Cache document view in NoSQL db:
+![model_schema](src/main/resources/searchengineReadme/cache_document_view.png)
 
 ___
 ## Model:
