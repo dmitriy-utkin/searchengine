@@ -15,15 +15,13 @@ import searchengine.dto.search.SearchDataItem;
 import searchengine.dto.search.SearchQueryResult;
 import searchengine.dto.search.SearchQueryObject;
 import searchengine.dto.search.SearchQueryPage;
-import searchengine.model.nosql.CacheSearch;
-import searchengine.model.sql.Index;
-import searchengine.model.sql.Lemma;
-import searchengine.model.sql.Site;
-import searchengine.repository.sql.IndexRepository;
-import searchengine.repository.sql.LemmaRepository;
-import searchengine.repository.sql.PageRepository;
-import searchengine.repository.sql.SiteRepository;
-import searchengine.services.cashSearch.CacheSearchService;
+import searchengine.model.Index;
+import searchengine.model.Lemma;
+import searchengine.model.Site;
+import searchengine.repository.IndexRepository;
+import searchengine.repository.LemmaRepository;
+import searchengine.repository.PageRepository;
+import searchengine.repository.SiteRepository;
 import searchengine.services.indexing.indexingTools.LemmaFinder;
 import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
@@ -43,18 +41,12 @@ public class SearchServiceImpl implements SearchService {
     private final LemmaFinder lemmaFinder;
     private final SearchConfig searchConfig;
     private final ErrorOptionConfig errorOptionConfig;
-    private final CacheSearchService cacheSearchService;
 
     @Override
     public ResponseEntity<ResponseService> search(String query, String site, int offset, int limit) {
         try {
             if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl
                     .ErrorResponse(errorOptionConfig.getEmptyQuerySearchError()), HttpStatus.BAD_REQUEST);
-            if (searchConfig.isWithCache() && cacheSearchService.existsByQueryAndSite(query, site)) {
-                CacheSearch cacheSearch = cacheSearchService.getByQueryAndSite(query, site);
-                Page<SearchDataItem> cachedResult = getCachedSearchResult(cacheSearch, offset, limit);
-                return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponse(cachedResult), HttpStatus.OK);
-            }
             Page<SearchDataItem> items = collectSearchDataItems(query, site, offset, limit);
             return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponse(items), HttpStatus.OK);
         } catch (Exception e) {
@@ -83,16 +75,9 @@ public class SearchServiceImpl implements SearchService {
         return (offset / limit);
     }
 
-    private Page<SearchDataItem> getCachedSearchResult(CacheSearch cacheSearch, int offset, int limit) {
-        List<SearchDataItem> items = cacheSearch.getSearchDataItems();
-        int endIndex = Math.min(offset + limit, items.size());
-        return getResultPage(items.subList(offset, endIndex), offset, limit, items.size());
-    }
-
     private void saveToCacheAllSearchDataItems(String query, String site, List<SearchQueryResult> queryResultList) {
         if (searchConfig.isWithCache()) {
             List<SearchDataItem> result = queryResultList.stream().map(this::createSearchDataItem).toList();
-            cacheSearchService.createCacheByQuery(query, site, result);
         }
     }
 

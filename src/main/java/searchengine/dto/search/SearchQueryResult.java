@@ -2,7 +2,7 @@ package searchengine.dto.search;
 
 import lombok.Builder;
 import lombok.Data;
-import searchengine.model.sql.Page;
+import searchengine.model.Page;
 
 import java.util.Set;
 

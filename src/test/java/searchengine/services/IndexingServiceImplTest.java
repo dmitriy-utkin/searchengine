@@ -4,8 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import searchengine.config.SiteConfig;
-import searchengine.model.sql.Site;
-import searchengine.model.sql.Status;
+import searchengine.model.Site;
+import searchengine.model.Status;
 import searchengine.services.indexing.IndexingServiceImpl;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;

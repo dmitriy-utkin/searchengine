@@ -6,11 +6,11 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import searchengine.config.JsoupConfig;
 import searchengine.dto.indexing.ExistedLemma;
-import searchengine.model.sql.Index;
-import searchengine.model.sql.Lemma;
-import searchengine.model.sql.Page;
-import searchengine.model.sql.Site;
-import searchengine.repository.sql.LemmaRepository;
+import searchengine.model.Index;
+import searchengine.model.Lemma;
+import searchengine.model.Page;
+import searchengine.model.Site;
+import searchengine.repository.LemmaRepository;
 
 import java.util.ArrayList;
 import java.util.List;

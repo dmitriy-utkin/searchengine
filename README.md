@@ -23,10 +23,7 @@ You can use the backend part like a search module for any website.
     4. [Search configuration](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#search-configuration)
 2. [How does it work? INDEXING](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#how-does-it-work-indexing)
 3. [How launch a serchengine app](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#how-launch-a-serchengine-app)
-4. [Now with cached search results](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#now-with-cached-search-results)
-    1. [How does it work?](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#how-does-it-work)
-    2. [Cache document view in NoSQL db](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#cache-document-view-in-nosql-db)
-5. [Model](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#model)
+4. [Model](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#model)
    1. [Site](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#site)
    2. [Page](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#page)
    3. [Lemma](https://github.com/dmitriy-utkin/searchengine/blob/main/README.md#lemma)
@@ -97,7 +94,7 @@ To be able to search some words on page, you should index it. This app can make 
 
 *__One more comment about indexing:__ it works in multithreading mode for each of the marked in config files sites* 
 
-## How launch a serchengine app
+## How to launch a serchengine app
 To launch it in local machine, you need to do a few simple things after downloading:
 1. Fist of all you need to create a database on localhost (the best option is a MySQL DB to do nothing changes in pom.xml etc.)
 2. Then you need a put the login information to the config file `application.yaml` to the bellow points (username, password, port number and database name:
@@ -134,49 +131,6 @@ To launch it in local machine, you need to do a few simple things after download
            name: Second site name axample
          ##   this field is a list, you may add as much as you need sites
   ```
-
-## Now with cached search results
-
-![cache_preview](src/main/resources/searchengineReadme/сache_preview.gif)
-___
-### How does it work?
-To create a cache for search result pages was used a MongoDB via Spring Boot. The main configuration options are below:
-* search_settings.withCache - to select a search work option (true - with cache, false - without)
-* cacheLongTtl - time to live for cache in db, default value is 60 sec
-
-```yaml
-search-settings:
-  maxQueryLengthToSkipChecking: 2
-  maxFrequencyInPercent: 50
-  defaultOffset: 0
-  defaultLimit: 20
-  snippetLength: 230
-  withCache: true #  <- use true if ypu want to use a cache with mongoDB 
-  cacheLongTtl: 60 # <- in seconds // if you want to change a ttl settings, please drop collection first
-```
-
-* uri - is a database link on your mongo local server
-* name - is a name of created database
-
-![Static Badge](https://img.shields.io/badge/PAY-ATTENTION_%231-red)
-
-__YOU SHOULD HAVE A USER IN THIS DB (OR USE A DEFAULT ADMIN USER/ROLE), to get an addition info, please visit a MongoDB documentation site__
-
-![Static Badge](https://img.shields.io/badge/PAY-ATTENTION_%232-red)
-
-__application can work without cache, but it will be waiting for 30 sec for MongoTemplate if you do not connect a MongoDB server, but keep a {"search_settings.withCache":"true"}__
-
-```yaml
-  data:
-    mongodb:
-      # (example) user: root; password: testTest; database: search_engine (if you want use
-      uri: mongodb://root:testTest@localhost:27017/search_engine
-      name: search_engine
-```
-
-### Cache document view in NoSQL db:
-![model_schema](src/main/resources/searchengineReadme/cache_document_view.png)
-
 ___
 ## Model:
 

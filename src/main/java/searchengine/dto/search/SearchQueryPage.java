@@ -3,7 +3,7 @@ package searchengine.dto.search;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import searchengine.model.sql.Page;
+import searchengine.model.Page;
 
 @Data
 @Builder
