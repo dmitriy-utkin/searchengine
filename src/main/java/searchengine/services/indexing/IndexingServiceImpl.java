@@ -10,14 +10,13 @@ import searchengine.config.JsoupConfig;
 import searchengine.config.SiteConfig;
 import searchengine.config.SitesListConfig;
 import searchengine.model.*;
-import searchengine.model.sql.*;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
-import searchengine.services.indexing.indexingTools.LemmaFinder;
-import searchengine.services.indexing.indexingTools.PageInfoCreator;
-import searchengine.services.indexing.indexingTools.SiteParseAction;
+import searchengine.services.indexing.tools.LemmaFinder;
+import searchengine.services.indexing.tools.PageInfoCreator;
+import searchengine.services.indexing.tools.SiteParseAction;
 import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
 

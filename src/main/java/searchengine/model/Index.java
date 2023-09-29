@@ -17,6 +17,7 @@ import javax.transaction.Transactional;
 @Transactional
 @Table(name = "indexes", indexes = {@javax.persistence.Index(name = "lemma_index", columnList = "lemma_id")})
 @DependsOn({"pages", "lemmas"})
+@Cacheable
 @NamedEntityGraph(name = "indexWithPageAndSite", attributeNodes = {@NamedAttributeNode(value = "page",
                                                     subgraph = "pagesWithSites")},
                                                     subgraphs = {@NamedSubgraph(name = "pagesWithSites",

@@ -15,16 +15,25 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
     hibernate:
       ddl-auto: update
+      cache:
+        use_second_level_cache: true
+        region:
+          factory_class: org.hibernate.cache.ehcache.EhCacheRegionFactory
+        provider_configuration_file_resource_path: ehcache.xml
+
     show-sql: true
 
+  cache:
+    jcache:
+      config: ehcache.xml
+
+
 search-settings:
-  maxQueryLengthToSkipChecking: 2
-  maxFrequencyInPercent: 50
-  defaultOffset: 0
-  defaultLimit: 20
+  maxFrequencyInPercent: 80
   snippetLength: 230
-  withCache: true
-  cacheLongTtl: 60 # <- in seconds // if you change a ttl setting, drop collection first (db.search_results.drop())
+  withCache: false
+  cacheTtl: 60 # <- in seconds
+  clearCacheEvery: 30 # <- in seconds
 
 error-settings:
   startIndexingError: Индексация уже запущена

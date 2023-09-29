@@ -9,6 +9,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import searchengine.config.CacheConfig;
 import searchengine.config.ErrorOptionConfig;
 import searchengine.config.SearchConfig;
 import searchengine.dto.search.SearchDataItem;
@@ -22,9 +23,11 @@ import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
-import searchengine.services.indexing.indexingTools.LemmaFinder;
+import searchengine.services.indexing.tools.LemmaFinder;
 import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
+import searchengine.services.search.tools.SearchCacheEngine;
+import searchengine.services.search.tools.SearchResultItem;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,12 +44,21 @@ public class SearchServiceImpl implements SearchService {
     private final LemmaFinder lemmaFinder;
     private final SearchConfig searchConfig;
     private final ErrorOptionConfig errorOptionConfig;
+    private final SearchCacheEngine searchCacheEngine;
+    private final CacheConfig cacheConfig;
 
     @Override
     public ResponseEntity<ResponseService> search(String query, String site, int offset, int limit) {
         try {
             if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl
                     .ErrorResponse(errorOptionConfig.getEmptyQuerySearchError()), HttpStatus.BAD_REQUEST);
+            if (searchConfig.isWithCache()) {
+                SearchResultItem result = searchCacheEngine.getSearchResultItem(query, site);
+                if (result != null) {
+                    return new ResponseEntity<>(new ResponseServiceImpl
+                            .SearchSuccessResponse(getResultPage(result, offset, limit)), HttpStatus.OK);
+                }
+            }
             Page<SearchDataItem> items = collectSearchDataItems(query, site, offset, limit);
             return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponse(items), HttpStatus.OK);
         } catch (Exception e) {
@@ -59,16 +71,22 @@ public class SearchServiceImpl implements SearchService {
     private Page<SearchDataItem> collectSearchDataItems(String query, String site, int offset, int limit) {
         Set<String> lemmas = lemmaFinder.collectLemmas(query).keySet();
         List<SearchQueryResult> queryResultList = collectResultPages(lemmas, site);
+        new Thread(() -> saveToCacheAllSearchDataItems(query, site, queryResultList)).start();
         if (queryResultList.isEmpty()) return new PageImpl<>(new ArrayList<>());
         int endIndex = Math.min(offset + limit, queryResultList.size());
         List<SearchDataItem> result = new ArrayList<>();
         queryResultList.subList(offset, endIndex).forEach(resultItem -> result.add(createSearchDataItem(resultItem)));
-        new Thread(() -> saveToCacheAllSearchDataItems(query, site, queryResultList)).start();
         return getResultPage(result, offset, limit, queryResultList.size());
     }
 
     private Page<SearchDataItem> getResultPage(List<SearchDataItem> result, int offset, int limit, int size) {
         return new PageImpl<>(result, PageRequest.of(getPageNumber(offset, limit), limit), size);
+    }
+
+    private Page<SearchDataItem> getResultPage(SearchResultItem searchResultItem, int offset, int limit) {
+        int endIndex = Math.min(offset + limit, searchResultItem.getSearchResults().size());
+        return new PageImpl<>(searchResultItem.getSearchResults().subList(offset, endIndex),
+                PageRequest.of(getPageNumber(offset, limit), limit), searchResultItem.getResultCount());
     }
 
     private int getPageNumber(int offset, int limit) {
@@ -78,6 +96,7 @@ public class SearchServiceImpl implements SearchService {
     private void saveToCacheAllSearchDataItems(String query, String site, List<SearchQueryResult> queryResultList) {
         if (searchConfig.isWithCache()) {
             List<SearchDataItem> result = queryResultList.stream().map(this::createSearchDataItem).toList();
+            searchCacheEngine.updateCache(query, site, result);
         }
     }
 
@@ -98,7 +117,7 @@ public class SearchServiceImpl implements SearchService {
         List<SearchQueryObject> result = new ArrayList<>();
         searchWords.forEach(lemma -> {
             Float sumFrequencyByLemma = getSumFrequencyByLemma(site, lemma);
-            if (isCorrectLemma(sumFrequencyByLemma, pagesNumber, searchWords.size()))
+            if (isCorrectLemma(sumFrequencyByLemma, pagesNumber))
                 result.add(createSearchQueryObjectByLemma(lemma, sumFrequencyByLemma.intValue(), site));
         });
         result.forEach(this::collectIndexes);
@@ -116,10 +135,9 @@ public class SearchServiceImpl implements SearchService {
         return lemmaRepository.sumFrequencyBySiteAndLemma(site, lemma).orElse(null);
     }
 
-    private boolean isCorrectLemma(Float sumFrequencyByLemma, long totalPagesNumber, int querySize) {
+    private boolean isCorrectLemma(Float sumFrequencyByLemma, long totalPagesNumber) {
         return sumFrequencyByLemma != null && totalPagesNumber > 0
-                && (((sumFrequencyByLemma / (float) totalPagesNumber * 100 < searchConfig.getMaxFrequencyInPercent())
-                || querySize <= searchConfig.getMaxQueryLengthToSkipChecking()));
+                && (sumFrequencyByLemma / (float) totalPagesNumber * 100 < searchConfig.getMaxFrequencyInPercent());
     }
 
     private SearchQueryObject createSearchQueryObjectByLemma(String lemma, int frequencyByLemma, Site site) {

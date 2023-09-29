@@ -11,10 +11,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "search-settings")
 public class SearchConfig {
     private int maxFrequencyInPercent;
-    private int defaultOffset;
-    private int defaultLimit;
     private int snippetLength;
-    private int maxQueryLengthToSkipChecking;
-    protected boolean withCache;
-    private long cacheLongTtl;
+    private boolean withCache;
+    private long cacheTtl;
+    private long clearCacheEvery;
 }

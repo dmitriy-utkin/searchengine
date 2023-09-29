@@ -1,0 +1,16 @@
+<ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="http://ehcache.org/ehcache.xsd"
+         updateCheck="false">
+    <diskStore path="java.io.tmpdir/ehcache" />
+    <cache name="searchCache"
+           maxEntriesLocalHeap="100"
+           maxEntriesLocalDisk="60"
+           eternal="false"
+           timeToIdleSeconds="60"
+           timeToLiveSeconds="60"
+           diskSpoolBufferSizeMB="20"
+           diskExpiryThreadIntervalSeconds="120"
+           memoryStoreEvictionPolicy="FIFO"
+           statistics="true">
+    </cache>
+</ehcache>
