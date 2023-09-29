@@ -7,13 +7,6 @@ spring:
     password: testTest
     url: jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true
 
-  data:
-    mongodb:
-      # (example) mongodb://USER:PASSWORD@localhost:27017/DATA_BASE_NAME
-      uri: mongodb://root:testTest@localhost:27017/search_engine
-      name: search_engine
-      time-out: 5000
-
   jpa:
     properties:
       hibernate:
