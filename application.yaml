@@ -31,9 +31,6 @@ spring:
 search-settings:
   maxFrequencyInPercent: 80
   snippetLength: 230
-  withCache: false
-  cacheTtl: 60 # <- in seconds
-  clearCacheEvery: 30 # <- in seconds
 
 error-settings:
   startIndexingError: Индексация уже запущена

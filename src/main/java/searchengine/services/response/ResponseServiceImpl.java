@@ -37,7 +37,6 @@ public enum ResponseServiceImpl {;
             this.result = true;
             this.count = items.isEmpty() ? 0 : items.getTotalElements();
             this.data = items.getContent();
-            log.info("Found " + count + " pages.");
         }
         Boolean result;
         long count;

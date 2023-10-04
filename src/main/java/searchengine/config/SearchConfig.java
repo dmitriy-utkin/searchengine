@@ -12,7 +12,4 @@ import org.springframework.stereotype.Component;
 public class SearchConfig {
     private int maxFrequencyInPercent;
     private int snippetLength;
-    private boolean withCache;
-    private long cacheTtl;
-    private long clearCacheEvery;
 }

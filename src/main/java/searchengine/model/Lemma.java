@@ -19,6 +19,7 @@ import javax.transaction.Transactional;
 @Table(name = "lemmas")
 @DependsOn("sites")
 @DynamicUpdate
+@Cacheable
 public class Lemma {
 
     @Id
