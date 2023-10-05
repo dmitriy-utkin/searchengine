@@ -1,5 +1,6 @@
 package searchengine.repository;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,9 +13,5 @@ import java.util.Optional;
 @Transactional
 public interface PageRepository extends JpaRepository<Page, Integer> {
     Optional<Page> findByPathAndSite(String path, Site site);
-
     long countBySite(Site site);
-
-    @Override
-    long count();
 }

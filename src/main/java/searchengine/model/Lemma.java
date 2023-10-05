@@ -2,6 +2,7 @@ package searchengine.model;
 
 import lombok.*;
 import org.hibernate.annotations.DynamicUpdate;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.DependsOn;
 
 import javax.persistence.*;

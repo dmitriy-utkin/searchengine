@@ -25,11 +25,9 @@ public interface LemmaRepository extends JpaRepository<Lemma, Integer> {
     @Cacheable("searchLemmaCache")
     Optional<List<Lemma>> findAllBySite(Site site);
 
-    @Cacheable("cacheLemmaFrequency")
     @Query("SELECT SUM(l.frequency) FROM Lemma l WHERE l.lemma = :lemma")
     Optional<Float> sumFrequencyByLemma(@Param("lemma") String lemma);
 
-    @Cacheable("cacheLemmaFrequency")
     @Query("SELECT SUM(l.frequency) FROM Lemma l WHERE l.site = :site AND l.lemma = :lemma")
     Optional<Float> sumFrequencyBySiteAndLemma(@Param("site") Site site, @Param("lemma") String lemma);
     long countBySite(Site site);

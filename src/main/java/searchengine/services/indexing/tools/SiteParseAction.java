@@ -39,7 +39,7 @@ public class SiteParseAction extends RecursiveAction {
             updateDataBase(url, site, creator.getPage(), creator.getLemmas(), creator.getIndexes());
             creator.getDoc().select("body").select("a").forEach(link -> {
                 String uri = link.absUrl("href");
-                if (isCorrectLink(uri, site.getUrl())) {
+                if (isCorrectLink(uri.toLowerCase(Locale.ROOT), site.getUrl())) {
                     SiteParseAction action = new SiteParseAction(config,siteRepository, pageRepository,
                             lemmaRepository, lemmaFinder,indexRepository, site,uri, processedLink);
                     action.fork();

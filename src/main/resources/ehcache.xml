@@ -1,0 +1,28 @@
+<ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="http://ehcache.org/ehcache.xsd"
+         updateCheck="false">
+    <diskStore path="java.io.tmpdir/ehcache"/>
+
+    <cache name="searchIndexCache"
+           maxEntriesLocalHeap="10"
+           maxEntriesLocalDisk="10"
+           eternal="false"
+           timeToIdleSeconds="20"
+           timeToLiveSeconds="55"
+           diskSpoolBufferSizeMB="5"
+           diskExpiryThreadIntervalSeconds="60"
+           memoryStoreEvictionPolicy="FIFO">
+    </cache>
+
+    <cache name="searchLemmaCache"
+           maxEntriesLocalHeap="10"
+           maxEntriesLocalDisk="10"
+           eternal="false"
+           timeToIdleSeconds="20"
+           timeToLiveSeconds="55"
+           diskSpoolBufferSizeMB="5"
+           diskExpiryThreadIntervalSeconds="60"
+           memoryStoreEvictionPolicy="FIFO">
+    </cache>
+
+</ehcache>

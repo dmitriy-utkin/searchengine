@@ -15,17 +15,13 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
     hibernate:
       ddl-auto: update
-      cache:
-        use_second_level_cache: true
-        region:
-          factory_class: org.hibernate.cache.ehcache.EhCacheRegionFactory
-        provider_configuration_file_resource_path: ehcache.xml
-
     show-sql: true
 
   cache:
     jcache:
-      config: ehcache.xml
+      type: ehcache
+      ehcache:
+        config: src/main/resources/ehcache.xml
 
 
 search-settings:
