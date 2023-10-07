@@ -5,7 +5,6 @@ ___
 ![Static Badge](https://img.shields.io/badge/Java-17-blue)
 ![Static Badge](https://img.shields.io/badge/Spring_Boot-2.7.1-green)
 ![Static Badge](https://img.shields.io/badge/Searchengine-application-orange)
-![Static Badge](https://img.shields.io/badge/Search%20result%20cache%20via-MongoDB-red)
 
 ---
 
@@ -67,19 +66,11 @@ The "normal form" is a base form of each word. I used a lucene.morphology api ([
 ### Search configuration
 
 Here you may find a few main settings:
-* `maxQueryLengthToSkipChecking` - how many words in search query you want to process? If you search query less than this one or equals, application will skip a check by `maxFrequencyInPercent` based on total frequency by word divide total pages by site or without site usage
 * `maxFrequencyInPercent` - if your search query size more than maxQueryLengthToSkipChecking, application will use words with total frequency by word divide total pages < `maxFrequencyInPercent`
-* `withCache` - do you want to use a cache for your search results? A little more about it in the block `"Now with cached search results"`
-* `cacheLongTtl` - how long your cache will be alive
 ```yaml
 search-settings:
-  maxQueryLengthToSkipChecking: 2
   maxFrequencyInPercent: 50
-  defaultOffset: 0
-  defaultLimit: 20
   snippetLength: 230
-  withCache: true
-  cacheLongTtl: 60
 ```
 
 ## How does it work? _INDEXING_
