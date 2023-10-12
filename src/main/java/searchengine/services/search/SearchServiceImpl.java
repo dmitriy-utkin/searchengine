@@ -27,6 +27,7 @@ import searchengine.services.response.ResponseService;
 import searchengine.services.response.ResponseServiceImpl;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -89,49 +90,34 @@ public class SearchServiceImpl implements SearchService {
 
     private List<SearchQueryObject> convertLemmaToSearchQueryObj(Set<String> searchWords, String siteUrl) {
         Site site = siteRepository.findByUrl(siteUrl).orElse(null);
-        long pagesNumber = getTotalPagesNumber(site);
         List<SearchQueryObject> result = new ArrayList<>();
-        searchWords.forEach(lemma -> {
-            Float sumFrequencyByLemma = getSumFrequencyByLemma(site, lemma);
-            if (isCorrectLemma(sumFrequencyByLemma, pagesNumber))
-                result.add(createSearchQueryObjectByLemma(lemma, sumFrequencyByLemma.intValue(), site));
-        });
-        result.forEach(this::collectIndexes);
+        searchWords.forEach(word -> result.add(createSearchQueryObjectByLemma(word, site)));
         result.forEach(this::collectSearchQueryPages);
         return result;
     }
 
-    private long getTotalPagesNumber(Site site) {
-        if (site == null) return pageRepository.count();
-        return pageRepository.countBySite(site);
+    private boolean isCorrectLemma(Lemma lemma, Map<Site, Long> pagesBySite) {
+        return ((float) lemma.getFrequency() / (float) pagesBySite.get(lemma.getSite()) * 100
+                < searchConfig.getMaxFrequencyInPercent());
     }
 
-    private Float getSumFrequencyByLemma(Site site, String lemma) {
-        if (site == null) return lemmaRepository.sumFrequencyByLemma(lemma).orElse(null);
-        return lemmaRepository.sumFrequencyBySiteAndLemma(site, lemma).orElse(null);
-    }
-
-    private boolean isCorrectLemma(Float sumFrequencyByLemma, long totalPagesNumber) {
-        return sumFrequencyByLemma != null && totalPagesNumber > 0
-                && (sumFrequencyByLemma / (float) totalPagesNumber * 100 < searchConfig.getMaxFrequencyInPercent());
-    }
-
-    private SearchQueryObject createSearchQueryObjectByLemma(String lemma, int frequencyByLemma, Site site) {
+    private SearchQueryObject createSearchQueryObjectByLemma(String lemma, Site site) {
         List<Lemma> lemmas;
         if (site == null) lemmas = lemmaRepository.findByLemma(lemma).orElse(null);
         else lemmas = lemmaRepository.findBySiteAndLemma(site, lemma).orElse(null);
         if (lemmas == null) return null;
-        return SearchQueryObject.builder().lemma(lemma).totalFrequency(frequencyByLemma).dbLemmaList(lemmas).build();
+        Map<Site, Long> pagesBySites = siteRepository.findAll().stream()
+                .collect(Collectors.toMap(Function.identity(), pageRepository::countBySiteWithCache));
+        lemmas = lemmas.stream().filter(checkedLemma -> isCorrectLemma(checkedLemma, pagesBySites)).toList();
+        return SearchQueryObject.builder().lemma(lemma)
+                .totalFrequency(lemmas.stream().mapToInt(Lemma::getFrequency).sum())
+                .dbLemmaList(lemmas).build();
     }
 
-    private void collectIndexes(SearchQueryObject searchQueryObject) {
-        searchQueryObject.setDbIndexList(indexRepository.findByLemmaIn(searchQueryObject.getDbLemmaList()));
-    }
 
     private void collectSearchQueryPages(SearchQueryObject searchQueryObject) {
-        List<SearchQueryPage> pages = new ArrayList<>();
-        searchQueryObject.getDbIndexList().forEach(index -> pages.add(getSearchQueryPage(index)));
-        searchQueryObject.setSearchQueryPageList(pages);
+        searchQueryObject.setSearchQueryPageList(indexRepository.findByLemmaIn(searchQueryObject.getDbLemmaList())
+                .stream().map(this::getSearchQueryPage).toList());
     }
 
     private SearchQueryPage getSearchQueryPage(Index index) {
@@ -142,11 +128,14 @@ public class SearchServiceImpl implements SearchService {
         if (list.isEmpty()) return new ArrayList<>();
         List<SearchQueryResult> result = createSearchResultList(list.get(0).getSearchQueryPageList());
         if (list.size() == 1) return result;
-        List<SearchQueryPage> pages = list.get(0).getSearchQueryPageList();
+        List<SearchQueryPage> pages = new ArrayList<>(list.get(0).getSearchQueryPageList());
         for (int i = 0; i < list.size() - 1; i++) {
-            pages.retainAll(list.get(i + 1).getSearchQueryPageList());
+            List<SearchQueryPage> currentPages = list.get(i + 1).getSearchQueryPageList();
+            List<SearchQueryPage> tempPages = new ArrayList<>(pages);
+            tempPages.retainAll(currentPages);
             if (pages.isEmpty()) return new ArrayList<>();
-            updateSearchQueryResult(result, pages);
+            updateSearchQueryResult(result, tempPages);
+            pages = tempPages;
         }
         return result;
     }
@@ -185,29 +174,24 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private String createSnippet(String content, Set<String> query) {
-        Map<String, String> equalsWords = lemmaFinder.collectNormalInitialForms(content, query);
+        int targetLength = searchConfig.getSnippetLength();
         String text = lemmaFinder.convertHtmlToText(content).trim();
-        String textToLower = text.toLowerCase();
+        String lowerCaseText = text.toLowerCase();
+        TreeMap<Integer, String> indexOfSearchedWords = lemmaFinder.collectNormalInitialForms(lowerCaseText, query);
         StringBuilder sb = new StringBuilder();
-        int plusMinusLength = searchConfig.getSnippetLength() / query.size() / 2;
-        int count = 0;
-        for (String word : query) {
-            int index = textToLower.indexOf(equalsWords.get(word));
-            int start = index == 0 ? 0 : Math.max(textToLower.indexOf(" ", index - plusMinusLength), 0);
-            int fromIndexForEnd = query.size() > 1 ? index + plusMinusLength : start + searchConfig.getSnippetLength();
-            int end = Math.min(textToLower.indexOf(" ", fromIndexForEnd), text.length());
-            try {
-                sb.append(count == 0 ? "..." : "").append(text, start, index)
-                        .append("<b>").append(equalsWords.get(word)).append("</b>")
-                        .append(text, index + equalsWords.get(word).length(), end == -1 ? text.length() : end)
-                        .append("...");
-            } catch (Exception e) {
-                e.printStackTrace();
-                sb.append(count == 0 ? "..." : "").append("<b>").append(equalsWords.get(word)).append("</b>...");
-            }
-            if (sb.length() >= searchConfig.getSnippetLength()) break;
-            count++;
-        }
+        int appendix = targetLength / query.size() / 2;
+        indexOfSearchedWords.keySet().forEach(key -> {
+            int start = Math.max(lowerCaseText.indexOf(" ", key - appendix), 0);
+            int wordEnd = lowerCaseText.indexOf(" ", key);
+            int end = Math.min(lowerCaseText.indexOf(" ", key + appendix), text.length());
+            sb.append(sb.isEmpty() ? "..." : "");
+            sb.append(text, Math.min(start, key), key);
+            sb.append("<b>");
+            sb.append(lowerCaseText, key, wordEnd);
+            sb.append("</b>");
+            sb.append(text, wordEnd, end == -1 ? text.length() : end);
+            sb.append("...");
+        });
         return sb.toString();
     }
 

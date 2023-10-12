@@ -18,6 +18,7 @@ import java.util.Date;
 @Transactional
 @Table(name = "sites")
 @DynamicUpdate
+@Cacheable
 public class Site {
 
     @Id

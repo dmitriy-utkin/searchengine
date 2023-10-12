@@ -4,24 +4,35 @@
     <diskStore path="java.io.tmpdir/ehcache"/>
 
     <cache name="searchIndexCache"
-           maxEntriesLocalHeap="10"
-           maxEntriesLocalDisk="10"
+           maxEntriesLocalHeap="100"
+           maxEntriesLocalDisk="100"
            eternal="false"
            timeToIdleSeconds="20"
            timeToLiveSeconds="55"
-           diskSpoolBufferSizeMB="5"
+           diskSpoolBufferSizeMB="50"
            diskExpiryThreadIntervalSeconds="60"
            memoryStoreEvictionPolicy="FIFO">
     </cache>
 
     <cache name="searchLemmaCache"
-           maxEntriesLocalHeap="10"
-           maxEntriesLocalDisk="10"
+           maxEntriesLocalHeap="100"
+           maxEntriesLocalDisk="100"
            eternal="false"
            timeToIdleSeconds="20"
            timeToLiveSeconds="55"
-           diskSpoolBufferSizeMB="5"
+           diskSpoolBufferSizeMB="50"
            diskExpiryThreadIntervalSeconds="60"
+           memoryStoreEvictionPolicy="FIFO">
+    </cache>
+
+    <cache name="pageCountCache"
+           maxEntriesLocalHeap="100"
+           maxEntriesLocalDisk="100"
+           eternal="false"
+           timeToIdleSeconds="20"
+           timeToLiveSeconds="180"
+           diskSpoolBufferSizeMB="50"
+           diskExpiryThreadIntervalSeconds="100"
            memoryStoreEvictionPolicy="FIFO">
     </cache>
 

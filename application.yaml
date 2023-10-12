@@ -24,7 +24,7 @@ spring:
         config: src/main/resources/ehcache.xml
 
 search-settings:
-  maxFrequencyInPercent: 80
+  maxFrequencyInPercent: 20
   snippetLength: 230
 
 error-settings:
@@ -56,15 +56,13 @@ indexing-settings:
       name: Lutheran Cathedral
     - url: https://www.svetlovka.ru/
       name: Svetlovka
-#    - url: https://www.programmaster.ru
-#      name: Program Master
-#    - url: https://dombulgakova.ru/
-#      name: Дом Булгакова
+    - url: https://www.programmaster.ru
+      name: Program Master
     - url: https://et-cetera.ru/mobile/
       name: ET Cetera
-#    - url: https://skillbox.ru
-#      name: Skillbox
+    - url: https://skillbox.ru
+      name: Skillbox
 #    - url: https://lenta.ru
 #      name: Лента.ру
-#    - url: https://www.playback.ru
-#      name: PlayBack
+    - url: https://www.playback.ru
+      name: PlayBack

@@ -47,11 +47,10 @@ public class LemmaFinder {
         return lemmas;
     }
 
-    public Map<String, String> collectNormalInitialForms(String content, Set<String> query) {
-        String text = convertHtmlToText(content);
+    public TreeMap<Integer, String> collectNormalInitialForms(String preparedText, Set<String> query) {
 
-        Map<String, String> result = new HashMap<>();
-        String[] words = getWordsArray(text);
+        TreeMap<Integer, String> result = new TreeMap<>();
+        String[] words = getWordsArray(preparedText);
 
         for (String word : words) {
 
@@ -65,7 +64,7 @@ public class LemmaFinder {
             List<String> normalForms = luceneMorphology.getNormalForms(word);
             if (normalForms.isEmpty()) continue;
 
-            if (query.stream().anyMatch(normalForms.get(0)::equals)) result.put(normalForms.get(0), word);
+            if (query.stream().anyMatch(normalForms.get(0)::equals)) result.put(preparedText.indexOf(word), word);
         }
 
         return result;

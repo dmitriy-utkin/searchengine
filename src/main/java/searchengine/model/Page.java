@@ -18,6 +18,7 @@ import javax.transaction.Transactional;
 @Transactional
 @Table(name = "pages", indexes = {@Index(name = "path_site_index", columnList = "site_id, path", unique = true)})
 @DependsOn("sites")
+@Cacheable
 public class Page {
 
     @Id
