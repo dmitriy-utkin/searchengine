@@ -24,7 +24,7 @@ spring:
         config: src/main/resources/ehcache.xml
 
 search-settings:
-  maxFrequencyInPercent: 20
+  maxFrequencyInPercent: 15
   snippetLength: 230
 
 error-settings:
