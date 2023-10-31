@@ -111,7 +111,7 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     private void updateSiteStatus(Site site, Status newStatus) {
-        if (newStatus.equals(Status.INDEXED) && !indexationIsRunning) return;
+        if (newStatus.equals(Status.INDEXED) && !indexationIsRunning) {return;}
         if (pageRepository.countBySite(site) == 1) {
             updateSiteStatus(site, Status.FAILED, errorOptionConfig.getMainPageUnavailableError());
             return;
@@ -129,7 +129,7 @@ public class IndexingServiceImpl implements IndexingService {
         siteRepository.saveAndFlush(site);
         log.info("Site status for \""+ site.getUrl() + "\" was changed to \""
                 + newStatus.toString() + "\" with last error \"" + lastError + "\".");
-        if (siteRepository.existsByStatus(Status.INDEXING)) indexationIsRunning = false;
+        if (siteRepository.existsByStatus(Status.INDEXING)) {indexationIsRunning = false;}
 
     }
 
@@ -149,8 +149,8 @@ public class IndexingServiceImpl implements IndexingService {
         clearDataBaseByOnePage(oldPage);
         PageInfoCreator creator = new PageInfoCreator(site, url, jsoupConfig,lemmaFinder, lemmaRepository);
         pageRepository.save(creator.getPage());
-        if (creator.getLemmas() != null) lemmaRepository.saveAllAndFlush(creator.getLemmas());
-        if (creator.getIndexes() != null) indexRepository.saveAllAndFlush(creator.getIndexes());
+        if (creator.getLemmas() != null) {lemmaRepository.saveAllAndFlush(creator.getLemmas());}
+        if (creator.getIndexes() != null) {indexRepository.saveAllAndFlush(creator.getIndexes());}
         updateSiteStatus(site, initialStatus);
         siteRepository.save(site);
         indexationIsRunning = false;
@@ -158,7 +158,7 @@ public class IndexingServiceImpl implements IndexingService {
 
     private void clearDataBaseByOnePage(Page page) {
         try {
-            if (page == null) return;
+            if (page == null) {return;}
             Optional<List<Index>> lemmaList = indexRepository.findByPage(page);
             lemmaList.ifPresent(indexes -> lemmaRepository.saveAllAndFlush(indexes.stream().map(dbIndex -> {
                 Lemma dbLemma = dbIndex.getLemma();
@@ -168,7 +168,7 @@ public class IndexingServiceImpl implements IndexingService {
             indexRepository.deleteByPage(page);
             pageRepository.deleteById(page.getId());
         } catch (Exception e) {
-            log.error("Error in method clearDataBaseByOnePage(Optional<DBPage> optionalDBPage): " + e.getMessage());
+            log.error(e.getMessage());
         }
     }
 }

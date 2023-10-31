@@ -5,6 +5,7 @@ spring:
   datasource:
     username: root
     password: testTest
+    # prod db: search_engine / test db: search_engine_test
     url: jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true
 
   jpa:
@@ -50,19 +51,19 @@ indexing-settings:
   timeout: 10000
   ignoreHttpErrors: true
   sites:
-    - url: https://ipfran.ru/
+    - url: https://ipfran.ru/ # prod version
       name: IP Fran
-    - url: https://www.lutherancathedral.ru/
+    - url: https://www.lutherancathedral.ru/ # prod version
       name: Lutheran Cathedral
-    - url: https://www.svetlovka.ru/
+    - url: https://www.svetlovka.ru/ # prod version
       name: Svetlovka
-    - url: https://www.programmaster.ru
+    - url: https://www.programmaster.ru # prod version
       name: Program Master
-    - url: https://et-cetera.ru/mobile/
+    - url: https://et-cetera.ru/mobile/ # prod version
       name: ET Cetera
-    - url: https://skillbox.ru
+    - url: https://skillbox.ru # prod version
       name: Skillbox
 #    - url: https://lenta.ru
 #      name: Лента.ру
-    - url: https://www.playback.ru
+    - url: https://www.playback.ru # prod version
       name: PlayBack

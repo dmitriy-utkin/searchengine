@@ -46,8 +46,10 @@ public class SearchServiceImpl implements SearchService {
     @Override
     public ResponseEntity<ResponseService> search(String query, String site, int offset, int limit) {
         try {
-            if (query.isBlank()) return new ResponseEntity<>(new ResponseServiceImpl
+            if (query.isBlank()) {
+                return new ResponseEntity<>(new ResponseServiceImpl
                     .ErrorResponse(errorOptionConfig.getEmptyQuerySearchError()), HttpStatus.BAD_REQUEST);
+            }
             Page<SearchDataItem> items = collectSearchDataItems(query, site, offset, limit);
             log.info("Found " + items.getTotalElements() + " pages by search query \"" + query.trim() + "\".");
             return new ResponseEntity<>(new ResponseServiceImpl.SearchSuccessResponse(items), HttpStatus.OK);
@@ -61,7 +63,7 @@ public class SearchServiceImpl implements SearchService {
     private Page<SearchDataItem> collectSearchDataItems(String query, String site, int offset, int limit) {
         Set<String> lemmas = lemmaFinder.collectLemmas(query).keySet();
         List<SearchQueryResult> queryResultList = collectResultPages(lemmas, site);
-        if (queryResultList.isEmpty()) return new PageImpl<>(new ArrayList<>());
+        if (queryResultList.isEmpty()) {return new PageImpl<>(new ArrayList<>());}
         int endIndex = Math.min(offset + limit, queryResultList.size());
         List<SearchDataItem> result = new ArrayList<>();
         queryResultList.subList(offset, endIndex).forEach(resultItem -> result.add(createSearchDataItem(resultItem)));
@@ -77,26 +79,26 @@ public class SearchServiceImpl implements SearchService {
         List<SearchQueryObject> result = new ArrayList<>();
         searchWords.forEach(word -> {
             SearchQueryObject object = createSearchQueryObjectByLemma(word, site);
-            if (object != null) result.add(object);
+            if (object != null) {result.add(object);}
         });
         return result;
     }
 
-    private SearchQueryPage getSearchQueryPage(Index index) {
+    private SearchQueryPage createSearchQueryPage(Index index) {
         return SearchQueryPage.builder().dbPage(index.getPage()).rank(index.getRank()).build();
     }
 
     private SearchQueryObject createSearchQueryObjectByLemma(String lemma, Site site) {
         List<Lemma> lemmas;
-        if (site == null) lemmas = lemmaRepository.findByLemma(lemma).orElse(null);
+        if (site == null) {lemmas = lemmaRepository.findByLemma(lemma).orElse(null);}
         else lemmas = lemmaRepository.findBySiteAndLemma(site, lemma).orElse(null);
-        if (lemmas == null) return null;
+        if (lemmas == null) {return null;}
         Map<Site, Long> pagesBySites = siteRepository.findAll().stream()
                 .collect(Collectors.toMap(Function.identity(), pageRepository::countBySiteWithCache));
         lemmas = lemmas.stream().filter(checkedLemma -> isCorrectLemma(checkedLemma, pagesBySites)).toList();
-        if (lemmas.isEmpty()) return null;
+        if (lemmas.isEmpty()) {return null;}
         List<SearchQueryPage> pages = indexRepository.findByLemmaIn(lemmas).stream()
-                .map(this::getSearchQueryPage).toList();
+                .map(this::createSearchQueryPage).toList();
         return SearchQueryObject.builder().lemma(lemma)
                 .totalFrequency(lemmas.stream().mapToInt(Lemma::getFrequency).sum())
                 .dbLemmaList(lemmas).searchQueryPageList(pages).build();
@@ -104,7 +106,7 @@ public class SearchServiceImpl implements SearchService {
 
     private List<SearchQueryResult> getSearchQueryResult(List<SearchQueryObject> objects) {
         List<SearchQueryResult> result = filterPagesByExisted(objects);
-        if (result.isEmpty()) return new ArrayList<>();
+        if (result.isEmpty()) {return new ArrayList<>();}
         int maxAbsRel = getMaxAbsRelevance(result);
         result.forEach(finalPage -> finalPage.setRelRel((double) finalPage.getAbsRel() / maxAbsRel));
         Set<String> lemmas = objects.stream().map(SearchQueryObject::getLemma).collect(Collectors.toSet());
@@ -114,15 +116,15 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private List<SearchQueryResult> filterPagesByExisted(List<SearchQueryObject> list) {
-        if (list.isEmpty()) return new ArrayList<>();
+        if (list.isEmpty()) {return new ArrayList<>();}
         List<SearchQueryResult> result = createSearchResultList(list.get(0).getSearchQueryPageList());
-        if (list.size() == 1) return result;
+        if (list.size() == 1) {return result;}
         List<SearchQueryPage> pages = new ArrayList<>(list.get(0).getSearchQueryPageList());
         for (int i = 0; i < list.size() - 1; i++) {
             List<SearchQueryPage> currentPages = list.get(i + 1).getSearchQueryPageList();
             List<SearchQueryPage> tempPages = new ArrayList<>(pages);
             tempPages.retainAll(currentPages);
-            if (pages.isEmpty()) return new ArrayList<>();
+            if (pages.isEmpty()) {return new ArrayList<>();}
             updateSearchQueryResult(result, tempPages);
             pages = tempPages;
         }
@@ -138,11 +140,11 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private List<SearchQueryResult> createSearchResultList(List<SearchQueryPage> searchQueryPages) {
-        if (searchQueryPages.isEmpty()) return new ArrayList<>();
-        return searchQueryPages.stream().map(this::getSearchResultWithoutRelRelevance).collect(Collectors.toList());
+        if (searchQueryPages.isEmpty()) {return new ArrayList<>();}
+        return searchQueryPages.stream().map(this::createSearchResultWithoutRelRelevance).collect(Collectors.toList());
     }
 
-    private SearchQueryResult getSearchResultWithoutRelRelevance(SearchQueryPage searchPage) {
+    private SearchQueryResult createSearchResultWithoutRelRelevance(SearchQueryPage searchPage) {
         return SearchQueryResult.builder().dbPage(searchPage.getDbPage()).absRel(searchPage.getRank()).build();
     }
 
@@ -160,7 +162,7 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private SearchDataItem createSearchDataItem(SearchQueryResult page) {
-        return SearchDataItem.builder().relevance(page.getRelRel()).title(getTitle(page.getDbPage().getContent()))
+        return SearchDataItem.builder().relevance(page.getRelRel()).title(createTitle(page.getDbPage().getContent()))
                 .snippet(createSnippet(page.getDbPage().getContent(), page.getLemmas()))
                 .uri(page.getDbPage().getPath()).site(page.getDbPage().getSite().getUrl())
                 .siteName(page.getDbPage().getSite().getName()).build();
@@ -179,21 +181,28 @@ public class SearchServiceImpl implements SearchService {
         StringBuilder sb = new StringBuilder();
         int appendix = targetLength / query.size() / 2;
         indexOfSearchedWords.keySet().forEach(key -> {
-            int start = Math.max(lowerCaseText.indexOf(" ", key - appendix), 0);
-            int wordEnd = lowerCaseText.indexOf(" ", key);
-            int end = Math.min(lowerCaseText.indexOf(" ", key + appendix), text.length());
-            sb.append(sb.isEmpty() ? "..." : "");
-            sb.append(text, Math.min(start, key), key);
-            sb.append("<b>");
-            sb.append(lowerCaseText, key, wordEnd);
-            sb.append("</b>");
-            sb.append(text, wordEnd, end == -1 ? text.length() : end);
-            sb.append("...");
+            try {
+                int start = Math.max(lowerCaseText.indexOf(" ", key - appendix), 0);
+                int wordEnd = lowerCaseText.indexOf(" ", key);
+                int end = Math.min(lowerCaseText.indexOf(" ", key + appendix), text.length());
+                sb.append(sb.isEmpty() ? "..." : "");
+                sb.append(text, Math.min(start, key), key);
+                sb.append("<b>");
+                sb.append(text, key, wordEnd);
+                sb.append("</b>");
+                sb.append(text, wordEnd, end == -1 ? text.length() : end);
+                sb.append("...");
+            } catch (Exception e) {
+                log.error(e.getMessage());
+                sb.append("...<b>");
+                sb.append(key);
+                sb.append("</b...");
+            }
         });
         return sb.toString();
     }
 
-    private String getTitle(String content) {
+    private String createTitle(String content) {
         try {
             return Jsoup.parse(content).title();
         } catch (Exception e) {

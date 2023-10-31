@@ -1,7 +1,11 @@
 package searchengine.services.indexing.tools;
 
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import searchengine.config.JsoupConfig;
 import searchengine.model.Index;
 import searchengine.model.Lemma;
@@ -40,8 +44,8 @@ public class SiteParseAction extends RecursiveAction {
             creator.getDoc().select("body").select("a").forEach(link -> {
                 String uri = link.absUrl("href");
                 if (isCorrectLink(uri.toLowerCase(Locale.ROOT), site.getUrl())) {
-                    SiteParseAction action = new SiteParseAction(config,siteRepository, pageRepository,
-                            lemmaRepository, lemmaFinder,indexRepository, site,uri, processedLink);
+                    SiteParseAction action = new SiteParseAction(config, siteRepository, pageRepository,
+                            lemmaRepository, lemmaFinder, indexRepository, site, uri, processedLink);
                     action.fork();
                     action.join();
                 } else {

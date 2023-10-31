@@ -28,13 +28,13 @@ public class LemmaFinder {
 
         for (String word : words) {
 
-            if (word.isBlank()) continue;
+            if (word.isBlank()) {continue;}
 
             List<String> wordBaseForms = luceneMorphology.getMorphInfo(word);
-            if (anyFormsBelongToParticle(wordBaseForms)) continue;
+            if (anyFormsBelongToParticle(wordBaseForms)) {continue;}
 
             List<String> normalForms = luceneMorphology.getNormalForms(word);
-            if (normalForms.isEmpty()) continue;
+            if (normalForms.isEmpty()) {continue;}
 
             String normalWords = normalForms.get(0);
             if (lemmas.containsKey(normalWords)) {
@@ -54,17 +54,17 @@ public class LemmaFinder {
 
         for (String word : words) {
 
-            if (query.size() == result.size()) return result;
+            if (query.size() == result.size()) {return result;}
 
-            if (word.isBlank()) continue;
+            if (word.isBlank()) {continue;}
 
             List<String> wordBaseForms = luceneMorphology.getMorphInfo(word);
-            if (anyFormsBelongToParticle(wordBaseForms)) continue;
+            if (anyFormsBelongToParticle(wordBaseForms)) {continue;}
 
             List<String> normalForms = luceneMorphology.getNormalForms(word);
-            if (normalForms.isEmpty()) continue;
+            if (normalForms.isEmpty()) {continue;}
 
-            if (query.stream().anyMatch(normalForms.get(0)::equals)) result.put(preparedText.indexOf(word), word);
+            if (query.stream().anyMatch(normalForms.get(0)::equals)) {result.put(preparedText.indexOf(word), word);}
         }
 
         return result;

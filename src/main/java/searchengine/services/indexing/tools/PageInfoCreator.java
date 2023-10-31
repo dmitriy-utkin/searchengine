@@ -51,7 +51,7 @@ public class PageInfoCreator {
 
     private Document getDoc(Connection.Response response) {
         try {
-            if (response == null) return null;
+            if (response == null) {return null;}
             return response.parse();
         } catch (Exception e) {
             e.printStackTrace();
@@ -60,7 +60,7 @@ public class PageInfoCreator {
     }
 
     private Page createPage(String url, Site site, Connection.Response response, Document doc) {
-        if (response == null || doc == null) return null;
+        if (response == null || doc == null) {return null;}
         return Page.builder().path(url.replace(site.getUrl(), "")).site(site).code(response.statusCode())
                 .content(doc.outerHtml()).build();
     }
@@ -85,7 +85,7 @@ public class PageInfoCreator {
     }
 
     private boolean isCorrectCodeCheck(Page page) {
-        if (page == null) return false;
+        if (page == null) {return false;}
         return !String.valueOf(page.getCode()).startsWith("4") || !String.valueOf(page.getCode()).startsWith("5");
     }
 
