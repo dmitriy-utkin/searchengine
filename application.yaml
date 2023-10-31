@@ -44,12 +44,13 @@ error-settings:
   internalServerError: Внутрення ошибка сервера
 
 indexing-settings:
-  userAgent: DeepSearchBot
-  referrer: http://www.google.com
-  redirect: true
-  sleep: 200
-  timeout: 10000
-  ignoreHttpErrors: true
+  jsoup-settings:
+    userAgent: DeepSearchBot
+    referrer: http://www.google.com
+    redirect: true
+    sleep: 200
+    timeout: 10000
+    ignoreHttpErrors: true
   sites:
     - url: https://ipfran.ru/ # prod version
       name: IP Fran
@@ -63,7 +64,5 @@ indexing-settings:
       name: ET Cetera
     - url: https://skillbox.ru # prod version
       name: Skillbox
-#    - url: https://lenta.ru
-#      name: Лента.ру
     - url: https://www.playback.ru # prod version
       name: PlayBack
