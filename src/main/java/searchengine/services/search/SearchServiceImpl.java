@@ -71,7 +71,8 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private List<SearchQueryResult> collectResultPages(Set<String> lemmas, String siteUrl) {
-        return getSearchQueryResult(convertLemmaToSearchQueryObj(lemmas, siteUrl));
+        List<SearchQueryObject> preparedSearchQueryObjects = convertLemmaToSearchQueryObj(lemmas, siteUrl);
+        return getSearchQueryResult(preparedSearchQueryObjects);
     }
 
     private List<SearchQueryObject> convertLemmaToSearchQueryObj(Set<String> searchWords, String siteUrl) {

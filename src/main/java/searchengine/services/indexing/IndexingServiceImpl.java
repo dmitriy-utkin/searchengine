@@ -85,10 +85,10 @@ public class IndexingServiceImpl implements IndexingService {
             String preparedUrl = newUrl.toLowerCase().trim();
             Site dbSite = siteRepository.findAll().stream().filter(site -> preparedUrl.startsWith(site.getUrl()))
                     .findFirst().orElse(null);
-            if (dbSite == null) return new ResponseEntity<>(new ResponseServiceImpl
-                        .ErrorResponse(errorOptionConfig.getSiteOutOfConfigError()), HttpStatus.NOT_FOUND);
-            if (dbSite.getStatus().equals(Status.INDEXING)) return new ResponseEntity<>(new ResponseServiceImpl
-                        .ErrorResponse(errorOptionConfig.getSiteIsIndexingError()),HttpStatus.METHOD_NOT_ALLOWED);
+            if (dbSite == null) {return new ResponseEntity<>(new ResponseServiceImpl
+                        .ErrorResponse(errorOptionConfig.getSiteOutOfConfigError()), HttpStatus.NOT_FOUND);}
+            if (dbSite.getStatus().equals(Status.INDEXING)) {return new ResponseEntity<>(new ResponseServiceImpl
+                        .ErrorResponse(errorOptionConfig.getSiteIsIndexingError()),HttpStatus.METHOD_NOT_ALLOWED);}
             new Thread(() -> updateDataBaseByOnePage(preparedUrl, dbSite)).start();
             return new ResponseEntity<>(new ResponseServiceImpl.IndexingSuccessResponse(), HttpStatus.OK);
         } catch (Exception e) {
