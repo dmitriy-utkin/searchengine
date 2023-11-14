@@ -18,7 +18,6 @@ public interface IndexRepository extends JpaRepository<Index, Integer> {
     void deleteByPage(Page page);
     Optional<List<Index>> findByPage(Page page);
 
-
     @Cacheable("searchIndexCache")
     @EntityGraph(value = "indexWithPageAndSite")
     List<Index> findByLemmaIn(List<Lemma> lemmas);

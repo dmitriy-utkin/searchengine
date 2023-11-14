@@ -5,8 +5,8 @@ spring:
   datasource:
     username: root
     password: testTest
-    url: jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true # prod
-#    url: jdbc:mysql://localhost:3306/search_engine_test?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true # test
+#    url: jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true # prod
+    url: jdbc:mysql://localhost:3306/search_engine_test?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true # test
 
   jpa:
     properties:
